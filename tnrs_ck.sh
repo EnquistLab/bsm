@@ -4,6 +4,19 @@
 # Check TNRS API routes functioning as expected
 #################################################
 
+#################################################
+# Status codes
+#
+# status_overall
+# 0 All tests passed
+# 1 One or more tests failed
+#
+# status_<route>
+# 0 Pass
+# 1 Fail, response content different from reference
+# 2 Error, reference file not found
+#################################################
+
 ########################
 # Parameters
 ########################
@@ -15,7 +28,12 @@ DATADIR="${DIR}/data"
 source ${DIR}/params.sh
 
 # Default URL from params file
-URL_DEF=URL_DEF_TNRS
+URL_DEF=$URL_DEF_TNRS
+
+# Service name for messages and filenames
+# Use short code, lowercase, no spaces
+svc="tnrs"
+svc_upper=${svc^^}
 
 ########################
 # Functions
@@ -45,11 +63,14 @@ url=""
 email=""
 notify=false
 quiet=false
+init=false
 	
 while [ "$1" != "" ]; do
 	# Get options		
 	case $1 in
         -q | --quiet )		quiet=true
+        					;;
+        -i | --initialize )		init=true
         					;;
 		-u | --url )		shift
 							URL=$1
@@ -85,7 +106,11 @@ if $quiet; then s_opt="-s"; fi
 ########################
 
 if ! $quiet; then 
-	echo "Testing TNRS"
+	if $init; then
+		echo "Initializing TNRS service checks"
+	else
+		echo "Running TNRS service checks"
+	fi
 	echo -e "URL="$URL"\n"
 fi
 
@@ -93,6 +118,26 @@ fi
 status_overall=0;
 status_resolve=0;
 status_parse=0;
+
+########################
+# Prepare test data
+########################
+
+if ! $quiet; then echo "Preparing test data..."; fi 
+cat << EOT > ${DATADIR}/ckapi_${svc}_data.csv
+id,species
+1,"Connarus venezuelanus"
+2,"Connarus venezuelensis"
+3,"Croton antisyphiliticus"
+4,"Croton antisiphyllitius"
+5,"Connarus sp.1"
+6,"Connarus"
+7,"Connaraceae Connarus absurdus"
+8,"Connarus absurdus"
+9,"Connaraceae Badgenus badspecies"
+10,"Rosaceae Badgenus badspecies"
+EOT
+if ! $quiet; then echo "done"; fi
 
 ########################
 # Test 1: Resolve mode
@@ -109,28 +154,12 @@ CLASS="wfo"
 MATCHES="best"
 
 if ! $quiet; then \
-	echo "MODE=${MODE}"
-	echo "SOURCES=${SOURCES}"
-	echo "CLASS=${CLASS}"
-	echo "MATCHES=${MATCHES}"
-	echo -n "Saving input data..."
+	echo "Settings:"
+	echo "  MODE=${MODE}"
+	echo "  SOURCES=${SOURCES}"
+	echo "  CLASS=${CLASS}"
+	echo "  MATCHES=${MATCHES}"
 fi
-
-# cd $WD
-cat << EOT > ${DATADIR}"/"ckapi_tnrs_data.csv
-id,species
-1,"Connarus venezuelanus"
-2,"Connarus venezuelensis"
-3,"Croton antisyphiliticus"
-4,"Croton antisiphyllitius"
-5,"Connarus sp.1"
-6,"Connarus"
-7,"Connaraceae Connarus absurdus"
-8,"Connarus absurdus"
-9,"Connaraceae Badgenus badspecies"
-10,"Rosaceae Badgenus badspecies"
-EOT
-if ! $quiet; then echo "done"; fi
 
 if ! $quiet; then echo -n "Sending API request..."; fi
 opts=$(jq -n \
@@ -139,7 +168,7 @@ opts=$(jq -n \
   --arg class "$CLASS" \
   --arg matches "$MATCHES" \
   '{"mode": $mode, "sources": $sources, "class": $class, "matches": $matches}')
-data=$(csvjson ${DATADIR}"/"ckapi_tnrs_data.csv)
+data=$(csvjson "${DATADIR}/ckapi_${svc}_data.csv")
 req_json='{"opts":'$opts',"data":'$data'}'
 resp_json=$(curl -s -X POST \
   -H "Content-Type: application/json" \
@@ -148,7 +177,7 @@ resp_json=$(curl -s -X POST \
   -d "$req_json" \
   "$URL" \
   )
-if ! $quiet; then echo -e "done\n"; fi
+if ! $quiet; then echo "done"; fi
 
 if ! $quiet; then 
 	# Extract elements from JSON and echo as table with header
@@ -157,22 +186,45 @@ if ! $quiet; then
 	echo " "
 fi
 
+# Set names of response and reference files
+f_resp="ckapi_${svc}_resolve.json"
+f_ref="ckapi_${svc}_resolve.json.reference"
+
 if ! $quiet; then echo -n "Saving response JSON..."; fi
-echo "$resp_json" > ${DATADIR}"/"ckapi_tnrs_resolve.json
-if ! $quiet; then echo -e "done\n"; fi
+echo "$resp_json" > "${DATADIR}/${f_resp}"
+if ! $quiet; then echo -e "done"; fi
 
 if ! $quiet; then echo -n "Comparing response JSON to reference JSON..."; fi
-diff ${DATADIR}"/"ckapi_tnrs_resolve.json ${DATADIR}"/"ckapi_tnrs_resolve.json.reference # &>/dev/null
-result=$?
 
-# Exit with appropriate exit status
-if [ "$result" == "0" ]; then
-	if ! $quiet; then echo -e "pass\n"; fi
-else
-	if ! $quiet; then echo -e "FAIL\n"; fi
+if [ ! -f "${DATADIR}/$f_ref" ]; then
+	if ! $quiet; then 
+		echo "ERROR: Reference file not found"
+		echo "[HINT: Run command with option '-i' first]"
+	fi
 	status_overall=1
-	status_resolve=1
+	status_resolve=2
+else
+	diff "${DATADIR}/${f_resp}" "${DATADIR}/${f_ref}" &>/dev/null
+	result=$?
+
+	# Echo result and set status
+	if [ "$result" == "0" ]; then
+		if ! $quiet; then echo -e "pass\n"; fi
+	else
+		if ! $quiet; then
+			echo -e "FAIL: response and reference differ\n"
+		fi
+		status_overall=1
+		status_resolve=1
+	fi
 fi
+
+
+echo "Exiting..."; exit 0
+
+
+
+
 
 ########################
 # Test 2: Parse mode

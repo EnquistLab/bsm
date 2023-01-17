@@ -10,7 +10,9 @@
 <a name="overview"></a>
 ## Overview
 
-The scripts in this repository monitor accessbility and performance of BIEN web services (APIs, R packages and web user interfaces). Monitoring scripts two general types of attributes: (1) Availability (is the service online and accessible?) and (2) Performance (are the main API endpoints and R package functions returning the expected responses, within a reasonable time (based on past performance)? The scripts are designed to run unsupervised and are generally run as cron jobs one to several times each (see section [Automation using cron](#automation) for recommended cron configuration). Failure of one or more checks trigger notifications to one or more admin emails, as specified in a shared parameter file. All scripts run on the Linux-type platforms (specifically, Ubuntu) and were written in bash. As some code is Bash-specific, we do not recommend running in other shells unless you are prepared to do some refactoring.
+The scripts in this repository monitor accessbility, function and performance of BIEN web services (APIs, R packages and web user interfaces). Monitoring scripts two general types of attributes: (1) Availability (is the service online?) and (2) Function (are the main API endpoints and R package functions returning the expected responses?) and (3) Performance (are response times reasonable?). The scripts are designed to run unsupervised as cron jobs one to several times each day (see section [Automation using cron](#automation) for recommended cron configuration). Any individual command can be run separately as needed. 
+
+Failure of one or more checks trigger notifications to the email(s) specified in the shared parameter file. All scripts run on the Linux-type platforms (specifically, Ubuntu) and were written in bash. As some code is Bash-specific, we do not recommend running in other shells unless you are prepared to do some refactoring.
 
 <a name="dependencies"></a>
 ## Software and dependencies
@@ -29,6 +31,7 @@ jq | 1.6
 
 Script name | Type    | Purpose
 ----------- | ------- | -------
+param.sh | Shared parameter file | Parameters used by all files. Hidden from GitHub to avoid exposing emails and URLs. See publicly accessible example file `params.sh.example`
 upsite.sh | Availability | Check the base URL of a service to confirm that it is up and accepting requests. If the service is down, checks the server as well. Returns exit codes 0 (success) or >1 (failure). See script for meaning of failuer codes.
  upsite\_batch.sh | Availability | Runs upsite.sh for multiple services and sends notification emails if errors detected
 tnrs_ck.sh | Performance | Tests each route of TNRS API to confirm response content as expected. Returns array with success/failure code for each test (route). See script for details of test results array.
@@ -70,7 +73,7 @@ Option code | Option    | Purpose | Argument(s)
 ### 3. ck_tnrs.sh
 
 ```
-./ck_tnrs.sh [-q] [-d] -u $URL
+./ck_tnrs.sh [-q] [-i] -u $URL
 ```
 
 **Options:**
@@ -78,6 +81,7 @@ Option code | Option    | Purpose | Argument(s)
 Option code | Option    | Purpose | Argument(s)
 ----------- | --------- | ------- | -----------
 <nobr>-q&#160;\|&#160;--quiet</nobr> | Quiet | Suppress all progress messages | (none)
+<nobr>-i&#160;\|&#160;--initialize</nobr> | Initialize | Generate response reference files only, without testing or sending notifications. Use this mode during initial setup and any time you make changes to service that affect response structure or content. Inspect each response file to verify that response is correct. | (none)
 <nobr>-u&#160;\|&#160;--url</nobr> | URL | Base URL of the service being monitored. Do not include route-specific commands or parameters. For BIEN API, the base URL entered into a browser display a simple message identifying the service and confirming that it is online | Base URL of the service (required)
 <nobr>-m&#160;\|&#160;--mailto</nobr> | Send email | Send notification email if one or more errors detected. Both option and argument are optional. However parameter $EMAIL_ADDRESS(ES) must be preceeded by '-m' option code. If no -m used but no address supplied, with use default email set in params file. If -m omitted, only echos test results to terminal screen. | One or more email addresses separated by commas. Optional. If ommitted uses default email in params file.
 
