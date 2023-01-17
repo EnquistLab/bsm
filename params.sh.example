@@ -1,0 +1,50 @@
+#!/bin/bash
+
+#################################################
+# Parameters shared by all file
+#
+# Service URLs, email addresses
+# Adjust as needed and save as "params.sh"
+#################################################
+
+################################
+# Default notification email(s)
+################################
+
+# Separate multiple addresses with comma, no spaces
+# This value over-ridden if email parameter supplied to option -m
+EMAIL_DEF="bob@gmail.com"
+EMAIL_DEF="bob@gmail.com,carol@gmail.com,ted@gmailcom"
+
+#########################################
+# Default service-specific URLs
+# Used by service-specific test scripts
+# E.g., tnrs_ck.sh
+#########################################
+
+URL_DEF_TNRS="https://tnrsapi.xyz/tnrs_api.php"
+
+
+
+
+
+#####################################
+# List of service base urls used by upsite.sh
+################################
+
+# Enter one service per line: name|url
+# Delimiter is pipe ("|"), don't use 
+# elsewhere. Use base url, not route 
+# No spaces, use underscore instead
+SVC_BASE_URLS="
+Google|https://www.google.com
+TNRS_API_production|https://tnrsapi.xyz
+TNRS_website|https://tnrs.biendata.org
+GNRS_website|https://gnrs.biendata.org
+"
+# Some test urls; all should fail
+# SVC_BASE_URLS="
+# Bad_url_test|https://www.somenonexistentsite.com
+# Bad_url_test2|asdfasdad.com
+# Bad_url_test3|junk
+# "

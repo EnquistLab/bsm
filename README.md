@@ -31,7 +31,8 @@ jq | 1.6
 
 Script name | Type    | Purpose
 ----------- | ------- | -------
-param.sh | Shared parameter file | Parameters used by all files. Hidden from GitHub to avoid exposing emails and URLs. See publicly accessible example file `params.sh.example`
+params.sh | Shared parameters file | Parameters used by all files. Not in GitHub. See publicly accessible example file `params.sh.example`
+params.sh.example | Example shared parameters file | Template/example for `params.sh`
 upsite.sh | Availability | Check the base URL of a service to confirm that it is up and accepting requests. If the service is down, checks the server as well. Returns exit codes 0 (success) or >1 (failure). See script for meaning of failuer codes.
  upsite\_batch.sh | Availability | Runs upsite.sh for multiple services and sends notification emails if errors detected
 tnrs_ck.sh | Performance | Tests each route of TNRS API to confirm response content as expected. Returns array with success/failure code for each test (route). See script for details of test results array.
