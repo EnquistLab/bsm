@@ -47,13 +47,62 @@ function jsonArrayToTable(){
 	jq '( .[0] | ([keys_unsorted[] | .] |(., map(length*"-"))) ), (.[] | [.[]]) | @csv'  | tr -d '\\'| column -t -s","  | tr -d '\"' 
 } 
 
-function jsonArrayToTableBAK(){
-	###############################
-	# Output JSON as tab-delimited 
-	# table with header
-	###############################
-	jq '( .[0] | keys_unsorted ), (.[] | [.[]]) | @csv'  | tr -d '\\'| column -t -s","  | tr -d '\"' 
-} 
+function ck_response() {
+	########################################
+	# Check or initialize service
+	########################################
+	
+	# assume success
+	status_mode=0
+
+	if $init; then
+		if ! $quiet; then echo -n "Saving response JSON as reference file..."; fi
+		echo "$resp_json" > "${DATADIR}/${f_ref}"
+		if ! $quiet; then echo -e "done"; fi
+	else
+		if ! $quiet; then echo -n "Comparing current and reference responses..."; fi
+
+		# Save response to file
+		echo "$resp_json" > "${DATADIR}/${f_resp}"
+
+		# Compare response and reference JSON files
+		if [ ! -f "${DATADIR}/$f_ref" ]; then
+			if ! $quiet; then 
+				echo "ERROR: Reference file not found"
+				echo "[HINT: Run command with option '-i' first]"
+			fi
+			status_overall=1
+			status_mode=2
+		else
+			diff "${DATADIR}/${f_resp}" "${DATADIR}/${f_ref}" &>/dev/null
+			result=$?
+
+			# Echo result and set status
+			if [ "$result" == "0" ]; then
+				if ! $quiet; then echo -e "pass\n"; fi
+			else
+				if ! $quiet; then
+					echo -e "FAIL: responses differ\n"
+				fi
+				status_overall=1
+				status_mode=1
+			fi
+		fi
+	fi
+	
+	#echo $status_mode
+}
+
+function send_request(){
+	req_json='{"opts":'$opts',"data":'$data'}'
+	resp_json=$(curl -s -X POST \
+	  -H "Content-Type: application/json" \
+	  -H "Accept: application/json" \
+	  -H "charset: UTF-8" \
+	  -d "$req_json" \
+	  "$URL" \
+	  )
+}
 
 ########################
 # Get options
@@ -63,6 +112,7 @@ url=""
 email=""
 notify=false
 quiet=false
+verbose=false
 init=false
 	
 while [ "$1" != "" ]; do
@@ -70,7 +120,9 @@ while [ "$1" != "" ]; do
 	case $1 in
         -q | --quiet )		quiet=true
         					;;
-        -i | --initialize )		init=true
+        -v | --verbose )	verbose=true
+        					;;
+        -i | --init )		init=true
         					;;
 		-u | --url )		shift
 							URL=$1
@@ -85,17 +137,12 @@ while [ "$1" != "" ]; do
 done	
 
 if [ "$URL" == "" ]; then
- 	if ! $quiet; then echo "Server parameter not defined, using default"; fi
 	URL=$URL_DEF
 fi
 
 if [ "$email" == "" ]; then
- 	if ! $quiet; then echo "Notification email parameter not defined, using default"; fi
 	email=$EMAIL_DEF
 fi
-
-
-echo "email="$email
 
 # "silent" option for curl command
 s_opt=""
@@ -107,26 +154,36 @@ if $quiet; then s_opt="-s"; fi
 
 if ! $quiet; then 
 	if $init; then
-		echo "Initializing TNRS service checks"
+		echo -e "Initializing TNRS service checks\n"
 	else
-		echo "Running TNRS service checks"
+		echo -e "Running TNRS service checks\n"
 	fi
-	echo -e "URL="$URL"\n"
+	
+	echo "URL: ${URL}"
+	echo "Notify: ${notify}"
+	
+	if $notify; then echo "Mail to: ${email}"; fi
+	echo " ";
 fi
 
-# Set overall status and route statuses
+# Set default overall status and route statuses to pass
 status_overall=0;
 status_resolve=0;
 status_parse=0;
 
 ########################
-# Prepare test data
+# Test 1: Resolve mode
 ########################
 
-if ! $quiet; then echo "Preparing test data..."; fi 
+if ! $quiet; then 
+	echo "------------------------------------------------------------"
+	echo -e "Test 1: Resolve mode\n"
+fi
+
+# Prepare test data
+if ! $quiet; then echo -n "Preparing test data..."; fi 
 cat << EOT > ${DATADIR}/ckapi_${svc}_data.csv
 id,species
-1,"Connarus venezuelanus"
 2,"Connarus venezuelensis"
 3,"Croton antisyphiliticus"
 4,"Croton antisiphyllitius"
@@ -139,15 +196,8 @@ id,species
 EOT
 if ! $quiet; then echo "done"; fi
 
-########################
-# Test 1: Resolve mode
-########################
-
-if ! $quiet; then 
-	echo "------------------------------------------------------------"
-	echo -e "Test 1: Resolve mode\n"
-fi
-
+# Set options
+# Which options are set and how can differ among API routes
 MODE="resolve"
 SOURCES="wcvp,usda"
 CLASS="wfo"
@@ -161,7 +211,7 @@ if ! $quiet; then \
 	echo "  MATCHES=${MATCHES}"
 fi
 
-if ! $quiet; then echo -n "Sending API request..."; fi
+# Compose options & data JSON objects
 opts=$(jq -n \
   --arg mode "$MODE" \
   --arg sources "$SOURCES" \
@@ -169,18 +219,13 @@ opts=$(jq -n \
   --arg matches "$MATCHES" \
   '{"mode": $mode, "sources": $sources, "class": $class, "matches": $matches}')
 data=$(csvjson "${DATADIR}/ckapi_${svc}_data.csv")
-req_json='{"opts":'$opts',"data":'$data'}'
-resp_json=$(curl -s -X POST \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json" \
-  -H "charset: UTF-8" \
-  -d "$req_json" \
-  "$URL" \
-  )
-if ! $quiet; then echo "done"; fi
 
-if ! $quiet; then 
-	# Extract elements from JSON and echo as table with header
+# Send request to service
+if ! $quiet; then echo -n "Sending request..."; fi
+send_request
+if ! $quiet; then echo "done"; fi
+if ! $quiet && $verbose; then 
+	echo "done"
 	echo -e "Results:\n"
 	echo "$resp_json" | jq 'map({Name_submitted, Name_matched})' | jsonArrayToTable
 	echo " "
@@ -188,43 +233,12 @@ fi
 
 # Set names of response and reference files
 f_resp="ckapi_${svc}_resolve.json"
-f_ref="ckapi_${svc}_resolve.json.reference"
+f_ref="${f_resp}.reference"
 
-if ! $quiet; then echo -n "Saving response JSON..."; fi
-echo "$resp_json" > "${DATADIR}/${f_resp}"
-if ! $quiet; then echo -e "done"; fi
-
-if ! $quiet; then echo -n "Comparing response JSON to reference JSON..."; fi
-
-if [ ! -f "${DATADIR}/$f_ref" ]; then
-	if ! $quiet; then 
-		echo "ERROR: Reference file not found"
-		echo "[HINT: Run command with option '-i' first]"
-	fi
-	status_overall=1
-	status_resolve=2
-else
-	diff "${DATADIR}/${f_resp}" "${DATADIR}/${f_ref}" &>/dev/null
-	result=$?
-
-	# Echo result and set status
-	if [ "$result" == "0" ]; then
-		if ! $quiet; then echo -e "pass\n"; fi
-	else
-		if ! $quiet; then
-			echo -e "FAIL: response and reference differ\n"
-		fi
-		status_overall=1
-		status_resolve=1
-	fi
-fi
-
-
-echo "Exiting..."; exit 0
-
-
-
-
+# Test or initialize service
+# Save return value as service-specific status code
+ck_response
+status_resolve=$status_mode
 
 ########################
 # Test 2: Parse mode
@@ -241,53 +255,38 @@ fi
 MODE="parse"
 
 if ! $quiet; then \
-	echo "MODE=${MODE}"
-	echo "Reusing previous input data"
+	echo "Settings:"
+	echo "  MODE=${MODE}"
 fi
 
-if ! $quiet; then echo -n "Sending API request..."; fi
+# Compose options & data JSON objects
 opts=$(jq -n \
   --arg mode "$MODE" \
   --arg sources "$SOURCES" \
   --arg class "$CLASS" \
   '{"mode": $mode, "sources": $sources, "class": $class}')
-data=$(csvjson ${DATADIR}"/"ckapi_tnrs_data.csv)
-req_json='{"opts":'$opts',"data":'$data'}'
-resp_json=$(curl -s -X POST \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json" \
-  -H "charset: UTF-8" \
-  -d "$req_json" \
-  "$URL" \
-  )
-if ! $quiet; then echo -e "done\n"; fi
+data=$(csvjson "${DATADIR}/ckapi_${svc}_data.csv")
 
-if ! $quiet; then 
+# Send request to service
+if ! $quiet; then echo -n "Sending request..."; fi
+send_request
+if ! $quiet; then echo "done"; fi
+
+# Echo response
+if ! $quiet && $verbose; then 
+	# Extract subset of element from JSON and echo as table with header
 	echo -e "Results:\n"
 	echo "$resp_json" | jq 'map({Name_submitted, Genus, Specific_epithet, Unmatched_terms})' | jsonArrayToTable
 	echo " "
 fi
 
-if ! $quiet; then echo -n "Saving response JSON..."; fi
-echo "$resp_json" > ${DATADIR}"/"ckapi_tnrs_parse.json
-if ! $quiet; then echo -e "done\n"; fi
+# Set names of response and reference files
+f_resp="ckapi_${svc}_parse.json"
+f_ref="${f_resp}.reference"
+
+# Test or initialize service
+# Save return value as service-specific status code
+ck_response
+status_parse=$status_mode
 
 
-echo "Exiting..."
-exit 0
-
-
-if ! $quiet; then echo -n "Comparing response JSON to reference JSON..."; fi
-diff ${DATADIR}"/"ckapi_tnrs_parse.json ${DATADIR}"/"ckapi_tnrs_parse.json.reference #&>/dev/null
-result=$?
-
-# Exit with appropriate exit status
-if [ "$result" == "0" ]; then
-	if ! $quiet; then echo -e "pass\n"; fi
-	exit 0
-else
-	if ! $quiet; then echo -e "FAIL\n"; fi
-	status_overall=1
-	status_parse=1
-fi
-	
