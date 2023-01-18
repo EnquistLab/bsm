@@ -79,6 +79,8 @@ elif [ $(echo "$response" | grep -q "200 OK"; echo $?) == 0 ]; then
 	svc_status="OK"
 elif [ $(echo "$response" | grep -q "Name or service not known"; echo $?) == 0 ]; then
 	svc_status="not found"
+elif [ $(echo "$response" | grep -q "onnection refused"; echo $?) == 0 ]; then
+	svc_status="Connection refused"
 fi
 
 if [[ $svc_status == "OK" ]] ; then
@@ -91,8 +93,11 @@ elif [[ $svc_status == "timeout" ]] ; then
 elif [[ $svc_status == "not found" ]] ; then
     if ! $quiet; then echo "not found ✗"; fi
     exitcode=3
+elif [[ $svc_status == "Connection refused" ]] ; then
+    if ! $quiet; then echo "Connection refused ✗"; fi
+    exitcode=3
 else
-    if ! $quiet; then echo "online with errors?"; fi
+    if ! $quiet; then echo "service inaccessible ✗"; fi
     exitcode=1
 fi
 
