@@ -39,6 +39,44 @@ svc_upper=${svc^^}
 # Functions
 ########################
 
+function unset_all(){
+	###############################
+	# Unset options and data 
+	# Prevent accidental carry-over
+	# from one test to another
+	###############################
+
+	unset MODE
+	unset SOURCES
+	unset CLASS
+	unset MATCHES
+	unset opts
+	unset data	
+}
+
+function echo_start(){
+	if ! $quiet; then 
+		if $init; then
+			action="Initializing"
+		else
+			action="Testing"
+		fi
+		
+		echo "------------------------------------------------------------"
+		echo -e "${action} mode ${MODE}\n"
+	fi
+}
+
+function echo_opts(){
+	if ! $quiet; then \
+		#echo "Settings:"
+		echo "MODE=${MODE}"
+		if [ ! "$SOURCES" == "" ]; then echo "SOURCES=${SOURCES}"; fi
+		if [ ! "$CLASS" == "" ]; then echo "CLASS=${CLASS}"; fi
+		if [ ! "$MATCHES" == "" ]; then echo "MATCHES=${MATCHES}"; fi
+	fi
+}
+
 function jsonArrayToTable(){
 	###############################
 	# Output JSON as tab-delimited 
@@ -47,6 +85,22 @@ function jsonArrayToTable(){
 	jq '( .[0] | ([keys_unsorted[] | .] |(., map(length*"-"))) ), (.[] | [.[]]) | @csv'  | tr -d '\\'| column -t -s","  | tr -d '\"' 
 } 
 
+function echo_resp(){
+	###############################
+	# Echo JSON response as table
+	# $flds is comma-delimited list
+	# of field to echo
+	###############################
+
+	if ! $quiet && $verbose; then 
+		echo -e "Results:\n"
+		#echo "$resp_json" | jq 'map({Name_submitted, Name_matched})' | jsonArrayToTable
+		map_flds="map({"$flds"})"
+		echo "$resp_json" | jq "$map_flds" | jsonArrayToTable
+		echo " "
+	fi
+}
+
 function ck_response() {
 	########################################
 	# Check or initialize service
@@ -54,6 +108,10 @@ function ck_response() {
 	
 	# assume success
 	status_mode=0
+
+	# Set names of response and reference files
+	f_resp="ckapi_${svc}_${MODE}.json"
+	f_ref="${f_resp}.reference"
 
 	if $init; then
 		if ! $quiet; then echo -n "Saving response JSON as reference file..."; fi
@@ -94,7 +152,7 @@ function ck_response() {
 }
 
 function send_request(){
-	req_json='{"opts":'$opts',"data":'$data'}'
+	if ! $quiet; then echo -n "Sending request..."; fi
 	resp_json=$(curl -s -X POST \
 	  -H "Content-Type: application/json" \
 	  -H "Accept: application/json" \
@@ -102,6 +160,13 @@ function send_request(){
 	  -d "$req_json" \
 	  "$URL" \
 	  )
+	if ! $quiet; then echo "done"; fi
+}
+
+function append_results(){
+	cat << EOT >> ${DATADIR}/ckapi_${svc}_results.csv
+${svc},${MODE},${status_mode}
+EOT
 }
 
 ########################
@@ -126,10 +191,6 @@ while [ "$1" != "" ]; do
         					;;
 		-u | --url )		shift
 							URL=$1
-							;;
-		-m | --mailto )		notify=true
-							shift
-							email=$1
 							;;
         * )                 echo "invalid option!"; exit 1
     esac
@@ -166,19 +227,36 @@ if ! $quiet; then
 	echo " ";
 fi
 
-# Set default overall status and route statuses to pass
-status_overall=0;
-status_resolve=0;
-status_parse=0;
+# Set all statuses to pass
+status_overall=0
+status_resolve=0
+status_parse=0
+status_meta=0
+status_sources=0
+status_citations=0
+status_classifications=0
+status_collaborators=0
+
+# Start results file (header)
+cat << EOT > ${DATADIR}/ckapi_${svc}_results.csv
+svc,mode,status
+EOT
 
 ########################
-# Test 1: Resolve mode
+# Test resolve mode
 ########################
 
-if ! $quiet; then 
-	echo "------------------------------------------------------------"
-	echo -e "Test 1: Resolve mode\n"
-fi
+# Parameters for this mode:
+#   api options
+#   flds - results fields to display (comma-delimited(
+MODE="resolve"
+SOURCES="wcvp,usda"
+CLASS="wfo"
+MATCHES="best"
+flds="Name_submitted,Name_matched"
+
+echo_start
+echo_opts
 
 # Prepare test data
 if ! $quiet; then echo -n "Preparing test data..."; fi 
@@ -196,21 +274,6 @@ id,species
 EOT
 if ! $quiet; then echo "done"; fi
 
-# Set options
-# Which options are set and how can differ among API routes
-MODE="resolve"
-SOURCES="wcvp,usda"
-CLASS="wfo"
-MATCHES="best"
-
-if ! $quiet; then \
-	echo "Settings:"
-	echo "  MODE=${MODE}"
-	echo "  SOURCES=${SOURCES}"
-	echo "  CLASS=${CLASS}"
-	echo "  MATCHES=${MATCHES}"
-fi
-
 # Compose options & data JSON objects
 opts=$(jq -n \
   --arg mode "$MODE" \
@@ -219,74 +282,204 @@ opts=$(jq -n \
   --arg matches "$MATCHES" \
   '{"mode": $mode, "sources": $sources, "class": $class, "matches": $matches}')
 data=$(csvjson "${DATADIR}/ckapi_${svc}_data.csv")
+req_json='{"opts":'$opts',"data":'$data'}'
 
 # Send request to service
-if ! $quiet; then echo -n "Sending request..."; fi
 send_request
-if ! $quiet; then echo "done"; fi
-if ! $quiet && $verbose; then 
-	echo "done"
-	echo -e "Results:\n"
-	echo "$resp_json" | jq 'map({Name_submitted, Name_matched})' | jsonArrayToTable
-	echo " "
-fi
 
-# Set names of response and reference files
-f_resp="ckapi_${svc}_resolve.json"
-f_ref="${f_resp}.reference"
+# Echo response JSON as table
+echo_resp
 
 # Test or initialize service
 # Save return value as service-specific status code
 ck_response
-status_resolve=$status_mode
+append_results
 
 ########################
-# Test 2: Parse mode
+# Test parse mode
 ########################
 
-if ! $quiet; then 
-	echo "------------------------------------------------------------"
-	echo -e "Test 2: Parse mode\n"
-fi
-
-# Only option used is $MODE
-# $SOURCES and $CLASS are required but not used
-# Need to fix this eventually
+# Parameters for this mode:
+#   api options
+#   flds - results fields to display (comma-delimited(
+unset_all
 MODE="parse"
+flds="Name_submitted, Genus, Specific_epithet, Unmatched_terms"
 
-if ! $quiet; then \
-	echo "Settings:"
-	echo "  MODE=${MODE}"
-fi
+echo_start
+echo_opts
 
 # Compose options & data JSON objects
 opts=$(jq -n \
   --arg mode "$MODE" \
-  --arg sources "$SOURCES" \
-  --arg class "$CLASS" \
-  '{"mode": $mode, "sources": $sources, "class": $class}')
+  '{"mode": $mode}')
 data=$(csvjson "${DATADIR}/ckapi_${svc}_data.csv")
+req_json='{"opts":'$opts',"data":'$data'}'
 
 # Send request to service
-if ! $quiet; then echo -n "Sending request..."; fi
 send_request
-if ! $quiet; then echo "done"; fi
 
-# Echo response
-if ! $quiet && $verbose; then 
-	# Extract subset of element from JSON and echo as table with header
-	echo -e "Results:\n"
-	echo "$resp_json" | jq 'map({Name_submitted, Genus, Specific_epithet, Unmatched_terms})' | jsonArrayToTable
-	echo " "
-fi
-
-# Set names of response and reference files
-f_resp="ckapi_${svc}_parse.json"
-f_ref="${f_resp}.reference"
+# Echo response JSON as table
+echo_resp
 
 # Test or initialize service
 # Save return value as service-specific status code
 ck_response
-status_parse=$status_mode
+append_results
+
+########################
+# Test metadata mode
+########################
+
+# Parameters for this mode:
+#   api options
+#   flds - results fields to display (comma-delimited(
+unset_all
+MODE="meta"
+flds="db_version, build_date, code_version, api_version"
+
+echo_start
+echo_opts
+
+# Compose options & data JSON objects
+opts=$(jq -n \
+  --arg mode "$MODE" \
+  '{"mode": $mode}')
+req_json='{"opts":'$opts'}'
+
+# Send request to service
+send_request
+
+# Echo response JSON as table
+echo_resp
+
+# Test or initialize service
+# Save return value as service-specific status code
+ck_response
+append_results
+
+########################
+# Test sources mode
+########################
+
+# Parameters for this mode:
+#   api options
+#   flds - results fields to display (comma-delimited(
+unset_all
+MODE="sources"
+flds="sourceID, sourceName, version, tnrsDateAccessed"
+
+echo_start
+echo_opts
+
+# Compose options & data JSON objects
+opts=$(jq -n \
+  --arg mode "$MODE" \
+  '{"mode": $mode}')
+req_json='{"opts":'$opts'}'
+
+# Send request to service
+send_request
+
+# Echo response JSON as table
+echo_resp
+
+# Test or initialize service
+# Save return value as service-specific status code
+ck_response
+append_results
+
+########################
+# Test citations mode
+########################
+
+# Parameters for this mode:
+#   api options
+#   flds - results fields to display (comma-delimited(
+unset_all
+MODE="citations"
+flds="source"
+
+echo_start
+echo_opts
+
+# Compose options & data JSON objects
+opts=$(jq -n \
+  --arg mode "$MODE" \
+  '{"mode": $mode}')
+req_json='{"opts":'$opts'}'
+
+# Send request to service
+send_request
+
+# Echo response JSON as table
+echo_resp
+
+# Test or initialize service
+# Save return value as service-specific status code
+ck_response
+append_results
+
+########################
+# Test classifications mode
+########################
+
+# Parameters for this mode:
+#   api options
+#   flds - results fields to display (comma-delimited(
+unset_all
+MODE="classifications"
+flds="sourceID, sourceName"
+
+echo_start
+echo_opts
+
+# Compose options & data JSON objects
+opts=$(jq -n \
+  --arg mode "$MODE" \
+  '{"mode": $mode}')
+req_json='{"opts":'$opts'}'
+
+# Send request to service
+send_request
+
+# Echo response JSON as table
+echo_resp
+
+# Test or initialize service
+# Save return value as service-specific status code
+ck_response
+append_results
+
+########################
+# Test collaborators mode
+########################
+
+# Parameters for this mode:
+#   api options
+#   flds - results fields to display (comma-delimited(
+unset_all
+MODE="collaborators"
+flds="collaboratorName, collaboratorNameFull"
+
+echo_start
+echo_opts
+
+# Compose options & data JSON objects
+opts=$(jq -n \
+  --arg mode "$MODE" \
+  '{"mode": $mode}')
+req_json='{"opts":'$opts'}'
+
+# Send request to service
+send_request
+
+# Echo response JSON as table
+echo_resp
+
+# Test or initialize service
+# Save return value as service-specific status code
+ck_response
+append_results
 
 
