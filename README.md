@@ -10,7 +10,9 @@
 <a name="overview"></a>
 ## Overview
 
-The scripts in this repository monitor accessbility, function and performance of BIEN web services (APIs, R packages and web user interfaces). Monitoring scripts two general types of attributes: (1) Availability (is the service online?) and (2) Function (are the main API endpoints and R package functions returning the expected responses?) and (3) Performance (are response times reasonable?). The scripts are designed to run unsupervised as cron jobs one to several times each day (see section [Automation using cron](#automation) for recommended cron configuration). Any individual command can be run separately as needed. 
+The scripts in this repository monitor accessibility, function and performance of BIEN web services (APIs, R packages and web user interfaces). These services include the TNRS, GNRS, and NSR.
+
+Monitoring scripts are of two general types of attributes: (1) Availability (is the service online?) and (2) Function (are the main API endpoints and R package functions returning the expected responses?) and (3) Performance (are response times reasonable?). The scripts are designed to run unsupervised as cron jobs one to several times each day (see section [Automation using cron](#automation) for recommended cron configuration). Any individual command can be run separately as needed. 
 
 Failure of one or more checks trigger notifications to the email(s) specified in the shared parameter file. All scripts run on the Linux-type platforms (specifically, Ubuntu) and were written in bash. As some code is Bash-specific, we do not recommend running in other shells unless you are prepared to do some refactoring.
 
