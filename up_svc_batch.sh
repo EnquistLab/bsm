@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ##############################################################
-# Check multiple services using upsite.sh
+# Check multiple services using up_svc.sh
 ##############################################################
 
 ##############################################################
@@ -102,7 +102,7 @@ for dom in $doms; do
 	fi
 	
 	# Check status of current service
-	${DIR}/upsite.sh $q_opt -u $url
+	${DIR}/up_svc.sh $q_opt -u $url
 	status=$?
 	
 	if [ ! "$status" == "0" ]; then 

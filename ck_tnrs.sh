@@ -94,6 +94,21 @@ prep_data=false
 # Functions
 ########################
 
+function unset_all(){
+	###############################
+	# Unset opt and data JSON elements,
+	# plus opt parameters other than $MODE
+	# Prevents carry-over from one
+	# test to another
+	###############################
+
+	unset SOURCES
+	unset CLASS
+	unset MATCHES
+	unset opts
+	unset data	
+}
+
 function echo_done(){
 	if ! $quiet; then echo "done"; fi
 }
@@ -111,20 +126,6 @@ function inlist() {
     list=$2
     delim=$3
     echo $list | tr "$delim" '\n' | grep -F -q -x "$value"
-}
-
-function unset_all(){
-	###############################
-	# Unset options and data 
-	# Prevents carry-over from one
-	# test to another
-	###############################
-
-	unset SOURCES
-	unset CLASS
-	unset MATCHES
-	unset opts
-	unset data	
 }
 
 function echo_start(){

@@ -16,7 +16,7 @@
 #################
 
 quiet=false
-debug=false
+verbose=false
 
 ########################
 # Get options
@@ -29,8 +29,8 @@ while [ "$1" != "" ]; do
 	case $1 in
         -q | --quiet )			quiet=true
         						;;
-        -d | --debug )			quiet=false
-        						debug=true
+        -v | --verbose )		quiet=false
+        						verbose=true
         						;;
 		-u | --url )			shift
 								url=$1
@@ -85,7 +85,7 @@ fi
 
 if [[ $svc_status == "OK" ]] ; then
     if ! $quiet; then echo "OK ✓"; fi
-	if $debug; then echo "exit status = 0"; fi
+	if $verbose; then echo "exit status = 0"; fi
     exit 0
 elif [[ $svc_status == "timeout" ]] ; then
     if ! $quiet; then echo "timeout ✗"; fi
@@ -121,5 +121,5 @@ else
 	exitcode=4
 fi
 
-if $debug; then echo "exit status = "$exitcode; fi
+if $verbose; then echo "exit status = "$exitcode; fi
 exit $exitcode
