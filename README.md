@@ -88,7 +88,7 @@ Option code | Option    | Purpose | Argument(s)
 <a name="automation"></a>
 ## Automation using cron
 
-The monitoring batch scripts should be set up to run as cron jobs. Rather than running as route or adding these jobs to your personal crontab, we recommend creating a user-specific cron file in directory `/etc/cron.d` and running the commands as a generic user with limited admin privileges. We use user "bien". This makes the scripts easier to locate and ensures that they are not deleted by upgrades.
+The monitoring batch scripts should be set up to run as cron jobs. Instead of running as root or via your personal crontab, we recommend creating a user-specific cron file in directory `/etc/cron.d` and running the commands as a generic, low-level admin user with limited privileges. This makes the scripts easier to locate and avoids deletion by upgrades.
 
 A cron entry that runs upsite_batch every hour on the hour using the default admin notification would look something like this:
 
