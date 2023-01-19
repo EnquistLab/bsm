@@ -10,16 +10,13 @@
 <a name="overview"></a>
 ## Overview
 
-The scripts in this repository monitor accessibility, function and performance of BIEN web services (APIs, R packages and web user interfaces). These services include the TNRS, GNRS, and NSR.
-
-Monitoring scripts are of two general types of attributes: (1) Availability (is the service online?) and (2) Function (are the main API endpoints and R package functions returning the expected responses?) and (3) Performance (are response times reasonable?). The scripts are designed to run unsupervised as cron jobs one to several times each day (see section [Automation using cron](#automation) for recommended cron configuration). Any individual command can be run separately as needed. 
-
-Failure of one or more checks trigger notifications to the email(s) specified in the shared parameter file. All scripts run on the Linux-type platforms (specifically, Ubuntu) and were written in bash. As some code is Bash-specific, we do not recommend running in other shells unless you are prepared to do some refactoring.
+These scripts monitor accessibility, function and performance of APIs, R packages and web user interfaces to BIEN web services such as the TNRS, GNRS, and NSR. The scripts monitor two classes of attributes: (1) availability (is the service online?) and (2) function (are the main API endpoints and R package functions returning the expected responses?). All applications are designed to run unsupervised as cron jobs. See section [Automation using cron](#automation) for recommended cron configurations. Any individual command can also be run separately, with options for normal, verbose and debugging output. 
+If the notification option is used, failure of one or more checks will trigger notifications emails to addresses specified in the shared parameter file. 
 
 <a name="dependencies"></a>
 ## Software and dependencies
 
-These script were developed under or require the following combination of operating system, shell and software:
+All scripts run on Linux-type systems. As some code is Bash-specific, we do not recommend running these applications in other shells unless you are prepared to do some refactoring.
 
 Software/OS | Version
 --- | ---
@@ -37,7 +34,7 @@ params.sh | Shared parameters file | Parameters used by all files. Not in GitHub
 params.sh.example | Example shared parameters file | Template/example for `params.sh`
 upsite.sh | Availability | Check the base URL of a service to confirm that it is up and accepting requests. If the service is down, checks the server as well. Returns exit codes 0 (success) or >1 (failure). See script for meaning of failuer codes.
  upsite\_batch.sh | Availability | Runs upsite.sh for multiple services and sends notification emails if errors detected
-tnrs_ck.sh | Performance | Tests each route of TNRS API to confirm response content as expected. Returns array with success/failure code for each test (route). See script for details of test results array.
+tnrs_ck.sh | Performance | Tests each endpoint of TNRS API to confirm response content as expected. Save test results as CSV file, with a success/failure code and message for each test. See script for details of test results array.
 svc\_ck\_batch.sh| Performance |  Runs performance check scripts (e.g., tnrs_ck.sh, gnrs_ch.sh, etc.) for multiple services and sends notification emails if errors detected for one or more services. **[PLANNED]**
 gnrs_ck.sh | Performance | Tests each route of GNRS API to confirm response content as expected. Other details as for tnrs_ck.sh. **[PLANNED]**
 nsr_ck.sh | Performance | Tests each route of NSR API to confirm response content as expected. Other details as for tnrs_ck.sh. **[PLANNED]**

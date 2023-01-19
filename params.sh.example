@@ -38,7 +38,7 @@ URL_DEF_TNRS="https://tnrsapi.xyz/tnrs_api.php"
 # No spaces, use underscore instead
 SVC_BASE_URLS="
 Google|https://www.google.com
-TNRS_API_production|https://tnrsapi.xyz
+TNRS_API|https://tnrsapi.xyz
 TNRS_website|https://tnrs.biendata.org
 GNRS_website|https://gnrs.biendata.org
 "
@@ -46,5 +46,4 @@ GNRS_website|https://gnrs.biendata.org
 # SVC_BASE_URLS="
 # Bad_url_test|https://www.somenonexistentsite.com
 # Bad_url_test2|asdfasdad.com
-# Bad_url_test3|junk
 # "
