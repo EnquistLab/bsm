@@ -31,9 +31,12 @@
 # Parameters
 #################################################
 
-# Set working directory & load default parameters
+# Get working directory & set data directory
 DIR="$(cd "$(dirname "$0")" && pwd)"
-DATADIR="${DIR}/data"
+# # Default data directory
+# DATADIR="${DIR}/data"
+# Custom data directory outside repository
+DATADIR="${DIR}/../data"
 
 # Service name for messages and filenames
 # Short code, lowercase, no spaces!
