@@ -34,7 +34,7 @@ params.sh.example | Example shared parameters file | Template/example for `param
 up\_svc.sh | Availability | Check the base URL of a service to confirm that it is up and accepting requests. If the service is down, checks the server as well. Returns exit codes 0 (success) or >1 (failure). See script for meaning of failuer codes.
  up\_svc\_batch.sh | Availability | Runs up\_svc.sh for multiple services and sends notification emails if errors detected
 ck\_tnrs.sh | Performance | Tests each endpoint of TNRS API to confirm response content as expected. Save test results as CSV file, with a success/failure code and message for each test. See script for details of test results array. If enabled, sends notification email(s) if one or more errors detected.
-svc\_ck\_batch.sh| Performance |  Runs performance check scripts (e.g., ck\_tnrs.sh, gnrs_ch.sh, etc.) for multiple services and sends notification emails if errors detected for one or more services. **[PLANNED]**
+ck\_svc\_batch.sh| Performance |  Runs performance check scripts (e.g., ck\_tnrs.sh, ck\_gnrs.sh, etc.) for multiple services. **[UNDER DEVELOPMENT]**
 gnrs_ck.sh | Performance | Tests each route of GNRS API to confirm response content as expected. Other details as for ck\_tnrs.sh. **[PLANNED]**
 nsr_ck.sh | Performance | Tests each route of NSR API to confirm response content as expected. Other details as for ck\_tnrs.sh. **[PLANNED]**
 gvs_ck.sh | Performance | Tests each route of GVS API to confirm response content as expected. Other details as for ck\_tnrs.sh. **[PLANNED]**
