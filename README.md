@@ -89,9 +89,9 @@ Option code | Option    | Purpose | Argument(s)
 <a name="automation"></a>
 ## Automation using cron
 
-The monitoring batch scripts should be set up to run as cron jobs. Instead of running as root or via your personal crontab, we recommend creating a user-specific cron file in directory `/etc/cron.d` and running the commands as a generic, low-level admin user with limited privileges. This makes the scripts easier to locate and avoids deletion by upgrades.
+The batch scripts and individual service check scripts (e.g., ck\_tnrs.sh) can be set up to run as cron jobs. Instead of running as root or via your personal crontab, we recommend creating a user-specific cron file in directory `/etc/cron.d` and running the commands under a generic, low-level admin user with limited privileges. This makes the scripts easier to locate and avoids deletion by upgrades.
 
-A cron entry that runs up\_svc_batch every hour on the hour using the default admin notification would look something like this:
+A cron entry that runs up\_svc_batch every hour on the hour using the default admin notification looks something like this:
 
 ```
 0 * * * * bien /home/bien/admin/monitoring/up_svc_batch.sh -q -m
