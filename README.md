@@ -33,7 +33,7 @@ params.sh | Shared parameters file | Parameters used by all files. Not in GitHub
 params.sh.example | Example shared parameters file | Template/example for `params.sh`
 up\_svc.sh | Availability | Check the base URL of a service to confirm that it is up and accepting requests. If the service is down, checks the server as well. Returns exit codes 0 (success) or >1 (failure). See script for meaning of failuer codes.
  up\_svc\_batch.sh | Availability | Runs up\_svc.sh for multiple services and sends notification emails if errors detected
-ck\_tnrs.sh | Performance | Tests each endpoint of TNRS API to confirm response content as expected. Save test results as CSV file, with a success/failure code and message for each test. See script for details of test results array.
+ck\_tnrs.sh | Performance | Tests each endpoint of TNRS API to confirm response content as expected. Save test results as CSV file, with a success/failure code and message for each test. See script for details of test results array. If enabled, sends notification email(s) if one or more errors detected.
 svc\_ck\_batch.sh| Performance |  Runs performance check scripts (e.g., ck\_tnrs.sh, gnrs_ch.sh, etc.) for multiple services and sends notification emails if errors detected for one or more services. **[PLANNED]**
 gnrs_ck.sh | Performance | Tests each route of GNRS API to confirm response content as expected. Other details as for ck\_tnrs.sh. **[PLANNED]**
 nsr_ck.sh | Performance | Tests each route of NSR API to confirm response content as expected. Other details as for ck\_tnrs.sh. **[PLANNED]**
@@ -72,17 +72,19 @@ Option code | Option    | Purpose | Argument(s)
 ### 3. ck_tnrs.sh
 
 ```
-./ck_tnrs.sh [-q] [-i] [-v] -u $URL
+./ck_tnrs.sh [-i] [-q] [-v] [-u [URL]] [-m [EMAIL_ADDRESSES]]
 ```
 
 **Options:**
 
 Option code | Option    | Purpose | Argument(s)
 ----------- | --------- | ------- | -----------
-<nobr>-q&#160;\|&#160;--quiet</nobr> | Quiet | Suppress all progress messages | (none)
 <nobr>-i&#160;\|&#160;--initialize</nobr> | Initialize | Generate response reference files only, without testing or sending notifications. Use this mode during initial setup and any time you make changes to service that change response structure or content. Inspect each response file to verify that response is correct. | (none)
+<nobr>-q&#160;\|&#160;--quiet</nobr> | Quiet | Suppress all progress messages | (none)
 <nobr>-v&#160;\|&#160;--verbose</nobr> | Verbose | Echoes input data and respose for each test request. Ignored if -q option used | (none)
 <nobr>-u&#160;\|&#160;--url</nobr> | URL | Base URL of the service being monitored. Do not include route-specific commands or parameters. For BIEN API, the base URL entered into a browser display a simple message identifying the service and confirming that it is online | Base URL of the service (required)
+<nobr>-m&#160;\|&#160;--mailto</nobr> | Send email | Send notification email if one or more errors detected. Both option and argument are optional. However parameter $EMAIL_ADDRESS(ES) must be preceeded by '-m' option code. If no -m used but no address supplied, with use default email set in params file. If -m omitted, only echos test results to terminal screen. | One or more email addresses separated by commas. Optional. If ommitted uses default email in params file.
+
 
 <a name="automation"></a>
 ## Automation using cron

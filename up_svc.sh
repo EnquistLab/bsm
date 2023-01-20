@@ -4,12 +4,25 @@
 # Check if base service is up and accepting requests
 #################################################
 
+##############################################################
+# Usage:
+# ./up_svc.sh [-q] [-v] -u $URL
+#
+# Options:
+#	-q: quiet
+#	-v: verbose
+#	-u: service URL, takes parameter $URL
+##############################################################
+
+#############################################
 # Exit status codes:
 # 0: service up, status OK
-# 1: service up, with errors
-# 2: service timed out, server OK
-# 3: service down or bad url, server OK
-# 4: server down or bad server name
+# 1: service inaccessible
+# 2: service timed out
+# 3: service not found
+# 4: service connection refused
+# 5: server down or bad server name
+#############################################
 
 #################
 # Parameters
@@ -85,7 +98,8 @@ fi
 
 if [[ $svc_status == "OK" ]] ; then
     if ! $quiet; then echo "OK ✓"; fi
-	if $verbose; then echo "exit status = 0"; fi
+    exitcode=0
+	if $verbose; then echo "exit status = ${exitcode}"; fi
     exit 0
 elif [[ $svc_status == "timeout" ]] ; then
     if ! $quiet; then echo "timeout ✗"; fi
@@ -95,7 +109,7 @@ elif [[ $svc_status == "not found" ]] ; then
     exitcode=3
 elif [[ $svc_status == "Connection refused" ]] ; then
     if ! $quiet; then echo "Connection refused ✗"; fi
-    exitcode=3
+    exitcode=4
 else
     if ! $quiet; then echo "service inaccessible ✗"; fi
     exitcode=1
@@ -118,7 +132,7 @@ if [[ $status == 0 ]] ; then
 	if ! $quiet; then echo "online ✓"; fi
 else
 	if ! $quiet; then echo "offline or bad url ✗"; fi
-	exitcode=4
+	exitcode=5
 fi
 
 if $verbose; then echo "exit status = "$exitcode; fi

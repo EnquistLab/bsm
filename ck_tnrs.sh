@@ -4,18 +4,22 @@
 # Check TNRS API routes functioning as expected
 #################################################
 
-#################################################
-# Status codes
+##############################################################
+# Usage:
+# ./ck_tnrs.sh [-i] [-q] [-v] [-u [URL]] [-m [EMAIL_ADDRESSES]]
 #
-# status_overall
-# 0 All tests passed
-# 1 One or more tests failed
-#
-# status_<route>
-# 0 Pass
-# 1 Fail, response content different from reference
-# 2 Error, reference file not found
-#################################################
+# Options:
+#	-i: initialize, saving each response as reference JSON file
+#	-q: quiet mode, no echo
+#	-v: verbose mode. Ignored if -q also used
+#	-u: service URL. If omitted or if optional URL parameter 
+#		omitted, uses default $URL_DEF (see below). 
+#	-m: send email notification of services with non-
+#		zero exit status. Followed by optional parameter
+#		EMAIL_ADDRESSES. Separate multiple addresses
+#		with commas. If addresses not supplied 
+# 		uses default parameter $email (see below). 
+##############################################################
 
 ######################################################
 # IMPORTANT NOTE
@@ -33,10 +37,6 @@
 
 # Get working directory & set data directory
 DIR="$(cd "$(dirname "$0")" && pwd)"
-# # Default data directory
-# DATADIR="${DIR}/data"
-# Custom data directory outside repository
-DATADIR="${DIR}/../data"
 
 # Service name for messages and filenames
 # Short code, lowercase, no spaces!
@@ -72,19 +72,30 @@ id,species
 10,"Rosaceae Badgenus badspecies"
 BLOCK
 
+# Upper case version of service code
+svc_upper=${svc^^}
+
+# Error notification email subject
+header="${svc_upper} error notification"
+
+# Error notification email body title
+ti="The following ${svc_upper} API modes returned errors:"
+
+
 ########################
 # Internal parameters
 # (do not change)
 ########################
 
-# Load external params file so we can set the remainder
+# Load external params file to set remaining parameters
 source ${DIR}/params.sh
 
 # Default URL from params file
 URL_DEF=$URL_DEF_TNRS
 
-# Upper case version of service code
-svc_upper=${svc^^}
+# Default notification email(s)
+# Overridden is email(s) supplied with -m option
+email_default=$EMAIL_DEF
 
 # These need to be false to start
 settings=false
@@ -93,6 +104,33 @@ prep_data=false
 ########################
 # Functions
 ########################
+
+function status_msg(){
+	###############################
+	# Returns status message for a
+	# give integer status code
+	#
+	# Usage:
+	# status_msg "$status"
+	###############################
+
+	case $status in
+	  0)
+		statusmsg="- OK"
+		;;
+	  1)
+		statusmsg="- FAIL: unexpected API response"
+		;;
+	  2)
+		statusmsg="- ERROR: no response"
+		;;
+	  *)
+		statusmsg="- Unknown error"
+		;;
+	esac	
+	
+	echo "$statusmsg"
+}
 
 function unset_all(){
 	###############################
@@ -197,7 +235,7 @@ function ck_response() {
 	status_mode=0
 
 	# Set names of response and reference files
-	f_resp="ckapi_${svc}_${MODE}.json"
+	f_resp="ck_${svc}_${MODE}.json"
 	f_ref="${f_resp}.reference"
 
 	if $init; then
@@ -299,7 +337,7 @@ function ck_svc(){
 	# Append current results to results file
 	# Do not change indentation! Last two lines
 	# must be flush with left margin.
-	cat << EOT >> ${DATADIR}/ckapi_${svc}_results.csv
+	cat << EOT >> ${DATADIR}/ck_${svc}_results.csv
 ${svc},${MODE},${status_mode}
 EOT
 }
@@ -330,6 +368,10 @@ while [ "$1" != "" ]; do
         					;;
 		-u | --url )		shift
 							URL=$1
+							;;
+		-m | --mailto )		notify=true
+							shift
+							email=$1
 							;;
         * )                 echo "invalid option!"; exit 1
     esac
@@ -377,7 +419,7 @@ status_classifications=0
 status_collaborators=0
 
 # Start results file (header)
-cat << EOT > ${DATADIR}/ckapi_${svc}_results.csv
+cat << EOT > ${DATADIR}/ck_${svc}_results.csv
 svc,mode,status
 EOT
 
@@ -385,7 +427,7 @@ EOT
 # Prepare test data
 ########################
 
-f_testdata="ckapi_${svc}_data.csv"
+f_testdata="ck_${svc}_data.csv"
 prep_data=true; echo_start
 
 if ! $quiet; then echo -n "Saving test data to file \"${f_testdata}\"..."; fi 
@@ -402,3 +444,34 @@ for curr_mode in $modes; do
 	set_mode_params
 	ck_svc
 done
+
+###############################
+# Send notification if errors
+###############################
+
+if [ ! "$status_overall" == "0" ]; then
+	modes_err=""
+	first_loop=1
+
+	# Read results file & compile error messages
+	while IFS="," read -r svc mode status; 	do
+
+		if [ ! "$status" == "0" ]; then 
+			status_msg=$(status_msg "$status")
+			mode_err="${mode}: exit status ${status} ${statusmsg}" 	
+			(( $first_loop )) 		&& 
+			modes_err="$mode_err"    ||  
+			modes_err="$modes_err\n$mode_err"    
+			unset first_loop
+		fi
+	done < <(tail -n +2 "${DATADIR}/ck_${svc}_results.csv")	
+
+	# Send notification email
+	if $notify && [ "$modes_err" != "" ] && ! $init; then
+		if ! $quiet; then echo -n "Sending sending service error notification..."; fi
+		modes_err=$(echo -e "$modes_err")
+		body=$(echo -e "${ti}\n\n${modes_err}\n\nURL: ${URL}\n\n")
+		echo -e "${body}\n\n"`date` | mail -s "$header" $email; 
+		if ! $quiet; then echo "done"; fi
+	fi
+fi

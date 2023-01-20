@@ -7,6 +7,13 @@
 # Adjust as needed and save as "params.sh"
 #################################################
 
+# Set data directory
+# $DIR is set by main script calling this one
+# # Default data directory
+# DATADIR="${DIR}/data"
+# Custom data directory outside repository
+DATADIR="${DIR}/../data"
+
 ################################
 # Default notification email(s)
 ################################

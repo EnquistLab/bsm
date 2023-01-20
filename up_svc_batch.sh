@@ -6,7 +6,7 @@
 
 ##############################################################
 # Usage:
-# ./upsite_batch.sh [-q] [-m [EMAIL_ADDRESSES]]
+# ./up_svc_batch.sh [-q] [-m [EMAIL_ADDRESSES]]
 #
 # Options:
 #	-q: quiet
@@ -24,7 +24,6 @@
 
 # Set working directory
 DIR="$(cd "$(dirname "$0")" && pwd)"
-DATADIR="${DIR}/data"
 
 # Load default parameters
 source ${DIR}/params.sh
@@ -36,13 +35,6 @@ doms=$SVC_BASE_URLS
 # Overridden is email(s) supplied with -m option
 email_default=$EMAIL_DEF
 
-#
-# Other parameters
-#
-
-# Verbose by default
-quiet=false
-
 # Error notification email subject
 header="BIEN service error notification"
 
@@ -53,9 +45,10 @@ ti="The following BIEN services may be down:"
 # Get options
 ########################
 
+quiet=false
+notify=false
 url=""
 email=""
-notify=false
 	
 while [ "$1" != "" ]; do
 	# Get options		
@@ -75,7 +68,7 @@ if [ "$email" == "" ]; then
 	email=$email_default
 fi
 
-# "quiet" option for upsite command
+# "quiet" option for up_svc command
 q_opt=""
 if $quiet; then q_opt="-q"; fi
 
@@ -84,8 +77,6 @@ if $quiet; then q_opt="-q"; fi
 ########################
 
 if ! $quiet; then echo "Checking service status"; fi
-
-DIR="$(cd "$(dirname "$0")" && pwd)"
 
 domsdown=""
 first_loop=1
