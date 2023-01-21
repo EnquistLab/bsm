@@ -6,19 +6,22 @@
 
 ##############################################################
 # Usage:
-# ./ck_tnrs.sh [-i] [-q] [-v] [-u [URL]] [-m [EMAIL_ADDRESSES]]
+# ./ck_tnrs.sh [-i] [-q] [-v] [-u [URL]] [-s INSTANCE] [-m [EMAIL_ADDRESSES]] 
 #
 # Options:
 #	-i: initialize, saving each response as reference JSON file
 #	-q: quiet mode, no echo
 #	-v: verbose mode. Ignored if -q also used
-#	-u: service URL. If omitted or if optional URL parameter 
-#		omitted, uses default $URL_DEF (see below). 
+#	-s: service instance. Short name for this instance.
+# 		Standardized as in params.sh., e.g., "TNRS production API". 
+#		If omitted uses default $URL_DEF (see below). 
+#	-u: service URL. If omitted or if URL parameter 
+#		omitted, uses default $INST_DEF_TNRS (see below). 
 #	-m: send email notification of services with non-
 #		zero exit status. Followed by optional parameter
 #		EMAIL_ADDRESSES. Separate multiple addresses
 #		with commas. If addresses not supplied 
-# 		uses default parameter $email (see below). 
+# 		uses default parameter $EMAIL_DEF (see below). 
 ##############################################################
 
 ######################################################
@@ -81,7 +84,6 @@ header="${svc_upper} error notification"
 # Error notification email body title
 ti="The following ${svc_upper} API modes returned errors:"
 
-
 ########################
 # Internal parameters
 # (do not change)
@@ -92,6 +94,9 @@ source ${DIR}/params.sh
 
 # Default URL from params file
 URL_DEF=$URL_DEF_TNRS
+
+# Default URL from params file
+INST_DEF=$INST_DEF_TNRS
 
 # Default notification email(s)
 # Overridden is email(s) supplied with -m option
@@ -235,7 +240,7 @@ function ck_response() {
 	status_mode=0
 
 	# Set names of response and reference files
-	f_resp="ck_${svc}_${MODE}.json"
+	f_resp="ck_${svc}_${inst}_${MODE}.json"
 	f_ref="${f_resp}.reference"
 
 	if $init; then
@@ -337,7 +342,7 @@ function ck_svc(){
 	# Append current results to results file
 	# Do not change indentation! Last two lines
 	# must be flush with left margin.
-	cat << EOT >> ${DATADIR}/ck_${svc}_results.csv
+	cat << EOT >> ${DATADIR}/${f_results}
 ${svc},${MODE},${status_mode}
 EOT
 }
@@ -351,6 +356,7 @@ EOT
 ########################
 
 url=""
+inst=""
 email=""
 notify=false
 quiet=false
@@ -366,6 +372,9 @@ while [ "$1" != "" ]; do
         					;;
         -i | --init )		init=true
         					;;
+		-s | --instance )	shift
+							inst=$1
+							;;
 		-u | --url )		shift
 							URL=$1
 							;;
@@ -378,6 +387,18 @@ while [ "$1" != "" ]; do
     shift
 done	
 
+# Use default instance if none supplied
+if [ "$inst" == "" ]; then
+	inst=$INST_DEF
+fi
+
+# Make instance string lower case with no whitespaces
+if [ ! "$inst" == "" ]; then
+	inst=${inst// /_}
+	inst=${inst,,}
+fi
+
+# Use default URL if none supplied
 if [ "$URL" == "" ]; then
 	URL=$URL_DEF
 fi
@@ -404,6 +425,7 @@ if ! $quiet; then
 	
 	echo "Settings:"
 	echo "URL: ${URL}"
+	echo "Instance: ${inst}"
 	echo "Notify: ${notify}"
 	if $notify; then echo "Mail to: ${email}"; fi
 fi
@@ -419,7 +441,8 @@ status_classifications=0
 status_collaborators=0
 
 # Start results file (header)
-cat << EOT > ${DATADIR}/ck_${svc}_results.csv
+f_results="ck_${svc}_${inst}_results.csv"
+cat << EOT > ${DATADIR}/${f_results}
 svc,mode,status
 EOT
 
@@ -464,7 +487,7 @@ if [ ! "$status_overall" == "0" ]; then
 			modes_err="$modes_err\n$mode_err"    
 			unset first_loop
 		fi
-	done < <(tail -n +2 "${DATADIR}/ck_${svc}_results.csv")	
+	done < <(tail -n +2 "${DATADIR}/${f_results}")	
 
 	# Send notification email
 	if $notify && [ "$modes_err" != "" ] && ! $init; then
@@ -474,4 +497,7 @@ if [ ! "$status_overall" == "0" ]; then
 		echo -e "${body}\n\n"`date` | mail -s "$header" $email; 
 		if ! $quiet; then echo "done"; fi
 	fi
+	exit 2
+else
+	exit 0
 fi

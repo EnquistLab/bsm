@@ -1,0 +1,13 @@
+
+TNRS|API private development|http://vegbiendev.nceas.ucsb.edu:8975/tnrs_api.php
+TNRS|API public development|http://vegbiendev.nceas.ucsb.edu:9975/tnrs_api.php
+TNRS|API production|https://tnrsapi.xyz/tnrs_api.php
+TNRS|website|https://tnrs.biendata.org/tnrs_api.php
+GNRS|API private development|http://vegbiendev.nceas.ucsb.edu:9875/gnrs_api.php
+GNRS|API public development|http://vegbiendev.nceas.ucsb.edu:8875/gnrs_api.php
+GNRS|API production|https://gnrsapi.xyz/gnrs_api.php
+GNRS|website|https://gnrs.biendata.org/gnrs_api.php
+NSR|API private development|http://vegbiendev.nceas.ucsb.edu:9865
+NSR|API production|https://nsrapi.xyz
+NSR|API production alt url|https://bien.nceas.ucsb.edu/nsr
+

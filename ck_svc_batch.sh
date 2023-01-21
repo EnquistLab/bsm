@@ -4,45 +4,46 @@
 
 ##############################################################
 # Usage:
-# ./ck_svc_batch.sh [-q] [-m [EMAIL_ADDRESSES]]
+# ./ck_svc_batch.sh [-q] [-c] [-v] [-m [EMAIL_ADDRESSES]]
 #
 # Options:
 #	-q: quiet
-#	-m: send email notification of services with non-
-#		zero exit status. Followed by optional parameter
-#		EMAIL_ADDRESSES. Separate multiple addresses
-#		with commas. If addresses not supplied 
-# 		uses default parameter $email (see below). 
+#	-c: curt mode. Only reports if one or more errors returned
+#		by service. Does not echo output from ck_<service> script.
+#	-v: verbose
+#	-m: send email notification of services if one or more
+#		services report errors. If followed by optional 
+#		parameter EMAIL_ADDRESSES, uses the latter instead of 
+#		default	address(es) from params file. Separate multiple 
+#		addresses with commas. 
 ##############################################################
 
-
 ######################################################
-# Parameters
+# Set directories load external parameters
 ######################################################
-
-# List of services to check
-# One service abbreviation per line
-# Use lower case (e.g., tnrs), no quotes or commas
-svcs="
-tnrs
-"
 
 # Set working directory
 DIR="$(cd "$(dirname "$0")" && pwd)"
-DATADIR="${DIR}/data"
 
-# Load default parameters
+# Load default parameters from separate
+# parameters file
 source ${DIR}/params.sh
 
-# Default notification email(s)
-# Overridden is email(s) supplied with -m option
+# Default notification email(s), as supplied by
+# parameters file. Overridden by emails supplied on
+# command line if -m option followed by EMAIL_ADDRESSES
+# parameter value
 email_default=$EMAIL_DEF
+
+# List of services to check
+doms=$APIS
 
 ########################
 # Get options
 ########################
 
 quiet=false
+curt=false
 notify=false
 url=""
 email=""
@@ -52,6 +53,10 @@ while [ "$1" != "" ]; do
 	case $1 in
         -q | --quiet )		quiet=true
         					;;
+        -c | --curt )		curt=true
+        					;;
+        -v | --verbose )	verbose=true
+        					;;
 		-m | --mailto )		notify=true
 							shift
 							email=$1
@@ -59,57 +64,105 @@ while [ "$1" != "" ]; do
         * )                 echo "invalid option!"; exit 1
     esac
     shift
-done	
+done
 
 if [ "$email" == "" ]; then
 	email=$email_default
 fi
 
-# "quiet" option for upsite command
+# "quiet" option for ck_[SERVICE] commands
 q_opt=""
-if $quiet; then q_opt="-q"; fi
+if $quiet || $curt; then q_opt="-q"; fi
+
+# "mail" option for ck_[SERVICE] commands
+m_opt=""
+if $notify; then m_opt="-m ${email}"; fi
+
+# Start by assuming no errors returned
+noerrs=0
 
 ########################
 # Main
 ########################
 
-if ! $quiet; then echo "Service endpoint checks"; fi
+if ! $quiet; then echo -e "BIEN service endpoint checks\n"; fi
 
-for svc in $svcs; do 
-	svc_upper=${svc^^}
-	f_svc_results="${DATADIR}/ck_${svc}_results.csv"
+# Remove leading and trailing newlines, if present
+doms="${doms#$'\n'}"
+doms="${doms%$'\n'}"
+
+# Check each service, as specified in shared parameters file
+while IFS='' read dom; do
+	status=0
+	IFS='|' read -ra arr <<< "$dom"
+	svc=${arr[0],,}
+	inst="${arr[1]}"
+	svc_upper="${arr[0]}"
+	svc_disp="${svc_upper} ${inst}"
+	url="${arr[2]}"
 	
-	if ! $quiet; then echo -n "Checking service \"${svc_upper}\"..."; fi
+	# Make  no-whitespace, lowercase version of instance
+	# for naming instance-specific results files
+	inst_nw=${inst// /_}; inst_nw=${inst_nw,,}
+
+	# API results file for this service
+	f_svc_results="${DATADIR}/ck_${svc}_results.csv"	
+
+# 	echo "svc: ${svc}"
+# 	echo "svc_disp: ${svc_disp}"
+# 	echo "url: ${url}"
 	
-# 	# Delete previous results file if present
-# 	rm_svc_results_cmd="rm ${DATADIR}/${f_svc_results}"
-# 	eval "$ck_svc_cmd"
+	if ! $quiet; then 
+		echo "#####################################################"
+		echo "Checking service \"${svc_disp}\":"
+	fi
 
 	# Check the service
-	ck_svc_cmd="./ck_${svc}.sh ${q_opt}"
-	eval "$ck_svc_cmd"
-	
-	row=1
-	while IFS="," read -r svc mode status; 	do
-	  echo "mode: ${mode}"
-	  echo "status: ${status}"
-	  echo ""
-	  row=$(($row+1))
-	done < <(tail -n +2 "${f_svc_results}")	
-	
-	# Get full-text status message
-	case $status in
-	  1)
-		statusmsg="- FAIL: response changed"
+	case $svc in
+	  tnrs)
+		./ck_tnrs.sh ${q_opt} ${m_opt} -s "$inst_nw" -u "$url"
+		status=$?
+		if ! $quiet; then echo "done"; fi
 		;;
-	  2)
-		statusmsg="- ERROR: no response"
+	  gnrs)
+		#./ck_gnrs.sh ${q_opt} ${m_opt} -u $url
+		#status=$?
+		if ! $quiet; then echo "UNDER CONSTRUCTION"; fi
+		;;
+	  nsr)
+		#./ck_nsr.sh ${q_opt} ${m_opt} -u $url
+		#status=$?
+		if ! $quiet; then echo "UNDER CONSTRUCTION"; fi
+		;;
+	  gvs)
+		#./ck_gvs.sh ${q_opt} ${m_opt} -u $url
+		#status=$?
+		if ! $quiet; then echo "UNDER CONSTRUCTION"; fi
 		;;
 	  *)
-		statusmsg="- Unknown status code"
+		echo "Unknown service"; exit 1
 		;;
 	esac	
+	
+	if ! $quiet; then
+		if [ "$status" == "2" ]; then
+			echo -e "WARNING: one or more modes returned error (non-zero exit status)\n"
+			noerrs=2
+		else
+			echo " "
+		fi
+	fi
+
+# 	row=1
+# 	while IFS="," read -r svc mode status; 	do
+# 	  echo "mode: ${mode}"
+# 	  echo "status: ${status}"
+# 	  echo ""
+# 	  row=$(($row+1))
+# 	done < <(tail -n +2 "${f_svc_results}")	
 
 
+done <<< $doms
 
-done
+# Echo final status on exit
+exit $noerrs
