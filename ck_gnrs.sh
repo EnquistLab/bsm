@@ -1,12 +1,12 @@
 #!/bin/bash
 
 #################################################
-# Check TNRS API routes functioning as expected
+# Check GNRS API routes functioning as expected
 #################################################
 
 ##############################################################
 # Usage:
-# ./ck_tnrs.sh [-i] [-q] [-v] [-d] [-u [URL]] [-s INSTANCE] [-m [EMAIL_ADDRESSES]] 
+# ./ck_gnrs.sh [-i] [-q] [-v] [-d] [-u [URL]] [-s INSTANCE] [-m [EMAIL_ADDRESSES]] 
 #
 # Options:
 #	-i: "init mode". Initialize checks, saving each response JSON
@@ -25,10 +25,10 @@
 #	-d: debug mode, extra verbose. Dumps everything verbose dumps, 
 #		and more. Echoes the entire, raw API response.
 #	-s: service instance. Short name for this instance.
-# 		Follow format in params.sh., e.g., "TNRS production API". 
-#		If omitted uses default $INST_TNRS_DEF (see below). 
+# 		Follow format in params.sh., e.g., "GNRS production API". 
+#		If omitted uses default $INST_GNRS_DEF (see below). 
 #	-u: service URL. If omitted or if URL parameter 
-#		omitted, uses default $INST_DEF_TNRS (see below). 
+#		omitted, uses default $INST_DEF_GNRS (see below). 
 #	-m: send email notification of services with non-
 #		zero exit status. Followed by optional parameter
 #		EMAIL_ADDRESSES. Separate multiple addresses
@@ -55,18 +55,27 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Service name for messages and filenames
 # Short code, lowercase, no spaces!
-# E.g. "tnrs" not "TNRS"
-svc="tnrs"
+# E.g. "gnrs" not "GNRS"
+svc="gnrs"
 
 # List of API modes (endpoints) to test for this service
 # One mode per line
 # No commas or other delimiters
 modes="
 resolve
-parse
+countrylist
+statelist
+countylist
+dd
 meta
 sources
-classifications
+citations
+collaborators
+"
+modes="
+resolve
+meta
+sources
 citations
 collaborators
 "
@@ -81,16 +90,18 @@ collaborators
 # Saved to CSV file
 # Comma-delimited with header
 read -d '' testdata <<"BLOCK"
-id,species
-2,"Connarus venezuelensis"
-3,"Croton antisyphiliticus"
-4,"Croton antisiphyllitius"
-5,"Connarus sp.1"
-6,"Connarus"
-7,"Connaraceae Connarus absurdus"
-8,"Connarus absurdus"
-9,"Connaraceae Badgenus badspecies"
-10,"Rosaceae Badgenus badspecies"
+id,country,state+province,county_parish
+user_id,country,state_province,county_parish
+1,Canada,British Colombia,
+2,Canada,"Nova Scotia, Province of",
+3,Mexico,Chiapas,Municipio de Vila Corzo
+4,Mexico,"Sonora, Estado de",Huépac
+5,Ukraine,Kharkiv,Novovodolaz'kyi
+6,USA,Arizona,Pima County
+7,USA,Puerto Rico,Mayagüez
+8,Puerto Rico,Mayagüez,
+9,UK,Scotland,Aberdeenshire
+10,Scotland,Aberdeenshire,
 BLOCK
 
 # Upper case version of service code
@@ -111,10 +122,10 @@ ti="The following ${svc_upper} API modes returned errors:"
 source ${DIR}/params.sh
 
 # Default URL from params file
-URL_DEF=$URL_DEF_TNRS
+URL_DEF=$URL_DEF_GNRS
 
 # Default URL from params file
-INST_DEF=$INST_DEF_TNRS
+INST_DEF=$INST_DEF_GNRS
 
 # Default notification email(s)
 # Overridden is email(s) supplied with -m option
@@ -163,9 +174,9 @@ function unset_all(){
 	# test to another
 	###############################
 
-	unset SOURCES
-	unset CLASS
-	unset MATCHES
+# 	unset SOURCES
+# 	unset CLASS
+# 	unset MATCHES
 	unset opts
 	unset data	
 }
@@ -225,18 +236,24 @@ function set_mode_params(){
 	# Set API request parameters for 
 	# current MODE
 	####################################
-	
+
 	if [ "$MODE" == "resolve" ]; then
-		SOURCES="wcvp,usda"
-		CLASS="wfo"
-		MATCHES="best"
-		flds="Name_submitted,Name_matched,Taxonomic_status,Accepted_name,Accepted_name_author"
-	elif [ "$MODE" == "parse" ]; then
-		flds="Name_submitted, Genus, Specific_epithet, Unmatched_terms"
+# 		SOURCES="wcvp,usda"
+# 		CLASS="wfo"
+# 		MATCHES="best" 
+		flds=""
+	elif [ "$MODE" == "countrylist" ]; then
+		flds=""
+	elif [ "$MODE" == "statelist" ]; then
+		flds=""
+	elif [ "$MODE" == "countylist" ]; then
+		flds=""
+	elif [ "$MODE" == "dd" ]; then
+		flds=""
 	elif [ "$MODE" == "meta" ]; then
 		flds="db_version, build_date, code_version, api_version"
 	elif [ "$MODE" == "sources" ]; then
-		flds="sourceID, sourceName, version, tnrsDateAccessed"	
+		flds="sourceID, sourceName, version, gnrsDateAccessed"	
 	elif [ "$MODE" == "classifications" ]; then
 		flds="sourceID, sourceName"
 	elif [ "$MODE" == "citations" ]; then
@@ -304,27 +321,26 @@ function ck_svc(){
 	echo_start
 	
 	# Echo options
-	if ! $quiet; then \
+	if ! $quiet; then 
 		#echo "Settings:"
 		echo "MODE=${MODE}"
-		if [ ! "$SOURCES" == "" ]; then echo "SOURCES=${SOURCES}"; fi
-		if [ ! "$CLASS" == "" ]; then echo "CLASS=${CLASS}"; fi
-		if [ ! "$MATCHES" == "" ]; then echo "MATCHES=${MATCHES}"; fi
+#		if [ ! "$CLASS" == "" ]; then echo "CLASS=${CLASS}"; fi
 	fi
 
 	# Compose options JSON
-	if [ "$MODE" == "resolve" ]; then
-		opts=$(jq -n \
-		  --arg mode "$MODE" \
-		  --arg sources "$SOURCES" \
-		  --arg class "$CLASS" \
-		  --arg matches "$MATCHES" \
-		  '{"mode": $mode, "sources": $sources, "class": $class, "matches": $matches}')
-	else
-		opts=$(jq -n --arg mode "$MODE" '{"mode": $mode}')
-	fi
+# 	if [ "$MODE" == "resolve" ]; then
+# 		opts=$(jq -n \
+# 		  --arg mode "$MODE" \
+# 		  --arg sources "$SOURCES" \
+# 		  --arg class "$CLASS" \
+# 		  --arg matches "$MATCHES" \
+# 		  '{"mode": $mode, "sources": $sources, "class": $class, "matches": $matches}')
+# 	else
+# 		opts=$(jq -n --arg mode "$MODE" '{"mode": $mode}')
+# 	fi
+	opts=$(jq -n --arg mode "$MODE" '{"mode": $mode}')
 	
-	if inlist "$MODE" "resolve,parse" ","; then
+	if [ "$MODE" == "resolve" ]; then
 		# Include options + data in api request 
 		data_raw="${DATADIR}/${f_testdata}"
 		data=$(csvjson "${data_raw}")
@@ -408,10 +424,16 @@ function ck_svc(){
 		echo -e "Response JSON as table:\n"
 
 		if [ "$http_status_code" == "200" ]; then
-			map_flds="map({"$flds"})"
-			echo "$resp_json" | jq "$map_flds" | jsonArrayToTable
-		echo " "
-		fi
+			if [ "$flds" == "" ]; then
+				# List all fields
+				echo "$resp_json" | jsonArrayToTable
+			else
+				# List selected fields
+				map_flds="map({"$flds"})"
+				echo "$resp_json" | jq "$map_flds" | jsonArrayToTable
+			fi
+			
+			echo " "
 	fi
 
 	# Test or initialize service
