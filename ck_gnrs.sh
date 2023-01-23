@@ -1,5 +1,15 @@
 #!/bin/bash
 
+
+
+#
+# Note: All working except statelist and countylist
+# continue at statelist (coded but still not working)
+#
+
+
+
+
 #################################################
 # Check GNRS API routes functioning as expected
 #################################################
@@ -72,38 +82,7 @@ sources
 citations
 collaborators
 "
-modes="
-resolve
-meta
-sources
-citations
-collaborators
-"
-# modes="
-# resolve
-# sources
-# classifications
-# badmode
-# "
 	
-# Test data
-# Saved to CSV file
-# Comma-delimited with header
-read -d '' testdata <<"BLOCK"
-id,country,state+province,county_parish
-user_id,country,state_province,county_parish
-1,Canada,British Colombia,
-2,Canada,"Nova Scotia, Province of",
-3,Mexico,Chiapas,Municipio de Vila Corzo
-4,Mexico,"Sonora, Estado de",Huépac
-5,Ukraine,Kharkiv,Novovodolaz'kyi
-6,USA,Arizona,Pima County
-7,USA,Puerto Rico,Mayagüez
-8,Puerto Rico,Mayagüez,
-9,UK,Scotland,Aberdeenshire
-10,Scotland,Aberdeenshire,
-BLOCK
-
 # Upper case version of service code
 svc_upper=${svc^^}
 
@@ -112,6 +91,49 @@ header="${svc_upper} error notification"
 
 # Error notification email body title
 ti="The following ${svc_upper} API modes returned errors:"
+
+########################
+# Internal parameters
+########################
+
+# Test data for mode "resolve"
+# Saved to CSV file
+# Comma-delimited with header
+read -d '' testdata <<"BLOCK"
+id,country,state_province,county_parish
+user_id,country,state_province,county_parish
+1,Canada,British Colombia,
+2,Mexico,Chiapas,Municipio de Vila Corzo
+3,Ukraine,Kharkiv,Novovodolaz'kyi
+4,USA,Arizona,Pima County
+5,USA,Puerto Rico,Mayaguez
+6,Puerto Rico,Mayagüez,
+7,UK,Scotland,Aberdeenshire
+8,Scotland,Aberdeenshire,
+BLOCK
+
+# Test data for mode "statelist"
+# Saved to CSV file
+# Comma-delimited list of GNRS country IDs, with header
+# Countries are: 'Costa Rica', 'Nicaragua', 'Panama'
+read -d '' testdata_sl <<"BLOCK"
+country_id
+3624060
+3703430
+3617476
+BLOCK
+
+# Test data for mode "countylist"
+# Saved to CSV file
+# Comma-delimited list of GNRS state/province IDs, with header
+read -d '' testdata_cl <<"BLOCK"
+state_province_id
+3624953
+3624368
+3830308
+3620673
+BLOCK
+
 
 ########################
 # Internal parameters
@@ -238,28 +260,26 @@ function set_mode_params(){
 	####################################
 
 	if [ "$MODE" == "resolve" ]; then
-# 		SOURCES="wcvp,usda"
+ 		BATCHES=2
 # 		CLASS="wfo"
 # 		MATCHES="best" 
-		flds=""
+		flds="poldiv_full, country, state_province, county_parish"
 	elif [ "$MODE" == "countrylist" ]; then
-		flds=""
+		flds="country_id, country, iso_alpha3, continent"
 	elif [ "$MODE" == "statelist" ]; then
-		flds=""
+		flds="state_province_id, country_id, country, state_province"
 	elif [ "$MODE" == "countylist" ]; then
-		flds=""
+		flds="county_parish_id, country, state_province_ascii, county_parish"
 	elif [ "$MODE" == "dd" ]; then
-		flds=""
+		flds="col_name, description"
 	elif [ "$MODE" == "meta" ]; then
-		flds="db_version, build_date, code_version, api_version"
+		flds="db_version, db_version_build_date, code_version, code_version_release_date"
 	elif [ "$MODE" == "sources" ]; then
-		flds="sourceID, sourceName, version, gnrsDateAccessed"	
-	elif [ "$MODE" == "classifications" ]; then
-		flds="sourceID, sourceName"
+		flds="source_id, source_name, version, date_accessed"	
 	elif [ "$MODE" == "citations" ]; then
 		flds="source"
 	elif [ "$MODE" == "collaborators" ]; then
-		flds="collaboratorName, collaboratorNameFull"
+		flds="collaborator_name, collaborator_name_full"
 # 	else
 # 		if ! $quiet; then echo "ERROR: unknown MODE \"${MODE}\"!"; fi
 # 		exit 1
@@ -328,21 +348,26 @@ function ck_svc(){
 	fi
 
 	# Compose options JSON
-# 	if [ "$MODE" == "resolve" ]; then
-# 		opts=$(jq -n \
-# 		  --arg mode "$MODE" \
-# 		  --arg sources "$SOURCES" \
-# 		  --arg class "$CLASS" \
-# 		  --arg matches "$MATCHES" \
-# 		  '{"mode": $mode, "sources": $sources, "class": $class, "matches": $matches}')
-# 	else
-# 		opts=$(jq -n --arg mode "$MODE" '{"mode": $mode}')
-# 	fi
-	opts=$(jq -n --arg mode "$MODE" '{"mode": $mode}')
-	
 	if [ "$MODE" == "resolve" ]; then
+		opts=$(jq -n \
+		  --arg mode "$MODE" \
+		  --arg batches "$BATCHES" \
+		  '{"mode": $mode, "batches": $batches}')
+	else
+		opts=$(jq -n --arg mode "$MODE" '{"mode": $mode}')
+	fi
+#	opts=$(jq -n --arg mode "$MODE" '{"mode": $mode}')
+	
+	if [ "$MODE" == "resolve" ] || [ "$MODE" == "statelist" ]  || [ "$MODE" == "countylist" ]; then
 		# Include options + data in api request 
-		data_raw="${DATADIR}/${f_testdata}"
+		if [ "$MODE" == "resolve" ]; then
+			data_raw="${DATADIR}/${f_testdata}"
+		elif [ "$MODE" == "statelist" ]; then
+			data_raw="${DATADIR}/${f_testdata_sl}"		
+		elif [ "$MODE" == "countylist" ]; then
+			data_raw="${DATADIR}/${f_testdata_cl}"		
+		fi
+		
 		data=$(csvjson "${data_raw}")
 
 		if ! $quiet && ( $verbose || $debug ); then 
@@ -434,6 +459,7 @@ function ck_svc(){
 			fi
 			
 			echo " "
+		fi
 	fi
 
 	# Test or initialize service
@@ -446,6 +472,7 @@ function ck_svc(){
 	cat << EOT >> ${DATADIR}/${f_results}
 ${svc},${MODE},${status_mode}
 EOT
+
 }
 
 #################################################
@@ -554,11 +581,23 @@ EOT
 # Prepare test data
 ########################
 
-f_testdata="ck_${svc}_data.csv"
 prep_data=true; echo_start
 
+# Data for mode='resolve'
+f_testdata="ck_${svc}_data.csv"
 if ! $quiet; then echo -n "Saving test data to file \"${f_testdata}\"..."; fi 
 echo "$testdata" > ${DATADIR}/${f_testdata}
+
+# Data for mode='statelist'
+f_testdata_sl="ck_${svc}_data_statelist.csv"
+if ! $quiet; then echo -n "Saving test data for mode 'statelist' to file \"${f_testdata_sl}\"..."; fi 
+echo "$testdata_sl" > ${DATADIR}/${f_testdata_sl}
+
+# Data for mode='statelist'
+f_testdata_cl="ck_${svc}_data_countylist.csv"
+if ! $quiet; then echo -n "Saving test data for mode 'countylist' to file \"${f_testdata_cl}\"..."; fi 
+echo "$testdata_cl" > ${DATADIR}/${f_testdata_cl}
+
 echo_done
 
 ###############################

@@ -125,9 +125,9 @@ while IFS='' read dom; do
 		if ! $quiet; then echo "done"; fi
 		;;
 	  gnrs)
-		#./ck_gnrs.sh ${q_opt} ${m_opt} -u $url
-		#status=$?
-		if ! $quiet; then echo "UNDER CONSTRUCTION"; fi
+		./ck_gnrs.sh ${q_opt} ${m_opt} -u $url
+		status=$?
+		if ! $quiet; then echo "done"; fi
 		;;
 	  nsr)
 		#./ck_nsr.sh ${q_opt} ${m_opt} -u $url
