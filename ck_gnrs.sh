@@ -587,17 +587,18 @@ prep_data=true; echo_start
 f_testdata="ck_${svc}_data.csv"
 if ! $quiet; then echo -n "Saving test data to file \"${f_testdata}\"..."; fi 
 echo "$testdata" > ${DATADIR}/${f_testdata}
+echo_done
 
 # Data for mode='statelist'
 f_testdata_sl="ck_${svc}_data_statelist.csv"
 if ! $quiet; then echo -n "Saving test data for mode 'statelist' to file \"${f_testdata_sl}\"..."; fi 
 echo "$testdata_sl" > ${DATADIR}/${f_testdata_sl}
+echo_done
 
 # Data for mode='statelist'
 f_testdata_cl="ck_${svc}_data_countylist.csv"
 if ! $quiet; then echo -n "Saving test data for mode 'countylist' to file \"${f_testdata_cl}\"..."; fi 
 echo "$testdata_cl" > ${DATADIR}/${f_testdata_cl}
-
 echo_done
 
 ###############################

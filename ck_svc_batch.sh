@@ -4,13 +4,14 @@
 
 ##############################################################
 # Usage:
-# ./ck_svc_batch.sh [-q] [-c] [-v] [-m [EMAIL_ADDRESSES]]
+# ./ck_svc_batch.sh [-q] [-c] [-v] [-i] [-m [EMAIL_ADDRESSES]]
 #
 # Options:
 #	-q: quiet
 #	-c: curt mode. Only reports if one or more errors returned
 #		by service. Does not echo output from ck_<service> script.
 #	-v: verbose
+#	-i: initialize
 #	-m: send email notification of services if one or more
 #		services report errors. If followed by optional 
 #		parameter EMAIL_ADDRESSES, uses the latter instead of 
@@ -45,6 +46,7 @@ doms=$APIS
 quiet=false
 curt=false
 notify=false
+init=false
 url=""
 email=""
 	
@@ -56,6 +58,8 @@ while [ "$1" != "" ]; do
         -c | --curt )		curt=true
         					;;
         -v | --verbose )	verbose=true
+        					;;
+        -i | --initialize )	init=true
         					;;
 		-m | --mailto )		notify=true
 							shift
@@ -73,6 +77,10 @@ fi
 # "quiet" option for ck_[SERVICE] commands
 q_opt=""
 if $quiet || $curt; then q_opt="-q"; fi
+
+# "init" option for ck_[SERVICE] commands
+i_opt=""
+if $init; then i_opt="-i"; fi
 
 # "mail" option for ck_[SERVICE] commands
 m_opt=""
@@ -120,7 +128,7 @@ while IFS='' read dom; do
 	# Check the service
 	case $svc in
 	  tnrs)
-		./ck_tnrs.sh ${q_opt} ${m_opt} -s "$inst_nw" -u "$url"
+		./ck_tnrs.sh ${q_opt} ${m_opt} ${i_opt} -s "$inst_nw" -u "$url"
 		status=$?
 		if ! $quiet; then echo "done"; fi
 		;;
