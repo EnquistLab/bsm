@@ -1,12 +1,12 @@
 #!/bin/bash
 
 #################################################
-# Check GNRS API routes functioning as expected
+# Check NSR API routes functioning as expected
 #################################################
 
 ##############################################################
 # Usage:
-# ./ck_gnrs.sh [-i] [-q] [-v] [-d] [-u [URL]] [-s INSTANCE] [-m [EMAIL_ADDRESSES]] 
+# ./ck_nsr.sh [-i] [-q] [-v] [-d] [-u [URL]] [-s INSTANCE] [-m [EMAIL_ADDRESSES]] 
 #
 # Options:
 #	-i: "init mode". Initialize checks, saving each response JSON
@@ -25,10 +25,10 @@
 #	-d: debug mode, extra verbose. Dumps everything verbose dumps, 
 #		and more. Echoes the entire, raw API response.
 #	-s: service instance. Short name for this instance.
-# 		Follow format in params.sh., e.g., "GNRS production API". 
-#		If omitted uses default $INST_DEF_GNRS (see below). 
+# 		Follow format in params.sh., e.g., "NSR production API". 
+#		If omitted uses default $INST_NSR_DEF (see below). 
 #	-u: service URL. If omitted or if URL parameter 
-#		omitted, uses default $INST_DEF_GNRS (see below). 
+#		omitted, uses default $INST_DEF_NSR (see below). 
 #	-m: send email notification of services with non-
 #		zero exit status. Followed by optional parameter
 #		EMAIL_ADDRESSES. Separate multiple addresses
@@ -39,9 +39,8 @@
 ######################################################
 # IMPORTANT NOTE
 # In addition to the parameters below, the following
-# functions require editing to adapt this script for
-# other services:
-#
+# functions will require editing to adapt this script 
+# to other services:
 # set_mode_params()
 # unset_all()
 # ck_svc()
@@ -56,22 +55,17 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Service name for messages and filenames
 # Short code, lowercase, no spaces!
-# E.g. "gnrs" not "GNRS"
-svc="gnrs"
+# E.g. "nsr" not "NSR"
+svc="nsr"
 
 # List of API modes (endpoints) to test for this service
 # One mode per line
 # No commas or other delimiters
 modes="
 resolve
-countrylist
-statelist
-countylist
-dd
 meta
 sources
 citations
-collaborators
 "
 	
 # Upper case version of service code
@@ -91,40 +85,14 @@ ti="The following ${svc_upper} API modes returned errors:"
 # Saved to CSV file
 # Comma-delimited with header
 read -d '' testdata <<"BLOCK"
-id,country,state_province,county_parish
-user_id,country,state_province,county_parish
-1,Canada,British Colombia,
-2,Mexico,Chiapas,Municipio de Vila Corzo
-3,Ukraine,Kharkiv,Novovodolaz'kyi
-4,USA,Arizona,Pima County
-5,USA,Puerto Rico,Mayaguez
-6,Puerto Rico,Mayagüez,
-7,UK,Scotland,Aberdeenshire
-8,Scotland,Aberdeenshire,
+taxon,country,state_province,county_parish,user_id
+Pinus ponderosa,United States,Arizona,Pima,1
+Eucalyptus,Australia,Western Australia,,2
+Abrothallus bertianus,Austria,,,3
+Cocos nucifera,Jamaica,,,4
+Eucalyptus,Mexico,,,5
+Larrea tridentata,Mexico,,,6
 BLOCK
-
-# Test data for mode "statelist"
-# Saved to CSV file
-# Comma-delimited list of GNRS country IDs, with header
-# Countries are: 'Costa Rica', 'Nicaragua', 'Panama'
-read -d '' testdata_sl <<"BLOCK"
-country_id
-3624060
-3703430
-3617476
-BLOCK
-
-# Test data for mode "countylist"
-# Saved to CSV file
-# Comma-delimited list of GNRS state/province IDs, with header
-read -d '' testdata_cl <<"BLOCK"
-state_province_id
-3624953
-3624368
-3830308
-3620673
-BLOCK
-
 
 ########################
 # Internal parameters
@@ -135,10 +103,10 @@ BLOCK
 source ${DIR}/params.sh
 
 # Default URL from params file
-URL_DEF=$URL_DEF_GNRS
+URL_DEF=$URL_DEF_NSR
 
 # Default URL from params file
-INST_DEF=$INST_DEF_GNRS
+INST_DEF=$INST_DEF_NSR
 
 # Default notification email(s)
 # Overridden is email(s) supplied with -m option
@@ -251,26 +219,13 @@ function set_mode_params(){
 	####################################
 
 	if [ "$MODE" == "resolve" ]; then
- 		BATCHES=2
-# 		CLASS="wfo"
-# 		MATCHES="best" 
-		flds="poldiv_full, country, state_province, county_parish"
-	elif [ "$MODE" == "countrylist" ]; then
-		flds="country_id, country, iso_alpha3, continent"
-	elif [ "$MODE" == "statelist" ]; then
-		flds="state_province_id, country_id, country, state_province"
-	elif [ "$MODE" == "countylist" ]; then
-		flds="county_parish_id, country, state_province_ascii, county_parish"
-	elif [ "$MODE" == "dd" ]; then
-		flds="col_name, description"
+		flds=""
 	elif [ "$MODE" == "meta" ]; then
-		flds="db_version, db_version_build_date, code_version, code_version_release_date"
+		flds=""
 	elif [ "$MODE" == "sources" ]; then
-		flds="source_id, source_name, version, date_accessed"	
+		flds=""	
 	elif [ "$MODE" == "citations" ]; then
 		flds="source"
-	elif [ "$MODE" == "collaborators" ]; then
-		flds="collaborator_name, collaborator_name_full"
 # 	else
 # 		if ! $quiet; then echo "ERROR: unknown MODE \"${MODE}\"!"; fi
 # 		exit 1
@@ -339,24 +294,20 @@ function ck_svc(){
 	fi
 
 	# Compose options JSON
-	if [ "$MODE" == "resolve" ]; then
-		opts=$(jq -n \
-		  --arg mode "$MODE" \
-		  --arg batches "$BATCHES" \
-		  '{"mode": $mode, "batches": $batches}')
-	else
-		opts=$(jq -n --arg mode "$MODE" '{"mode": $mode}')
-	fi
-#	opts=$(jq -n --arg mode "$MODE" '{"mode": $mode}')
+# 	if [ "$MODE" == "resolve" ]; then
+# 		opts=$(jq -n \
+# 		  --arg mode "$MODE" \
+# 		  --arg batches "$BATCHES" \
+# 		  '{"mode": $mode, "batches": $batches}')
+# 	else
+# 		opts=$(jq -n --arg mode "$MODE" '{"mode": $mode}')
+# 	fi
+	opts=$(jq -n --arg mode "$MODE" '{"mode": $mode}')
 	
 	if [ "$MODE" == "resolve" ] || [ "$MODE" == "statelist" ]  || [ "$MODE" == "countylist" ]; then
 		# Include options + data in api request 
 		if [ "$MODE" == "resolve" ]; then
 			data_raw="${DATADIR}/${f_testdata}"
-		elif [ "$MODE" == "statelist" ]; then
-			data_raw="${DATADIR}/${f_testdata_sl}"		
-		elif [ "$MODE" == "countylist" ]; then
-			data_raw="${DATADIR}/${f_testdata_cl}"		
 		fi
 		
 		data=$(csvjson "${data_raw}")
@@ -578,18 +529,6 @@ prep_data=true; echo_start
 f_testdata="ck_${svc}_data.csv"
 if ! $quiet; then echo -n "Saving test data to file \"${f_testdata}\"..."; fi 
 echo "$testdata" > ${DATADIR}/${f_testdata}
-echo_done
-
-# Data for mode='statelist'
-f_testdata_sl="ck_${svc}_data_statelist.csv"
-if ! $quiet; then echo -n "Saving test data for mode 'statelist' to file \"${f_testdata_sl}\"..."; fi 
-echo "$testdata_sl" > ${DATADIR}/${f_testdata_sl}
-echo_done
-
-# Data for mode='statelist'
-f_testdata_cl="ck_${svc}_data_countylist.csv"
-if ! $quiet; then echo -n "Saving test data for mode 'countylist' to file \"${f_testdata_cl}\"..."; fi 
-echo "$testdata_cl" > ${DATADIR}/${f_testdata_cl}
 echo_done
 
 ###############################

@@ -58,6 +58,9 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 # E.g. "tnrs" not "TNRS"
 svc="tnrs"
 
+# Caps version of service, if needed
+svc_uc=$(echo $svc | tr 'a-z' 'A-Z')
+
 # List of API modes (endpoints) to test for this service
 # One mode per line
 # No commas or other delimiters
@@ -76,6 +79,12 @@ collaborators
 # classifications
 # badmode
 # "
+
+# API options application to mode 'resolve' only
+# Make sure these are up to date
+opt_sources="wcvp"
+opt_class="wfo"
+opt_matches="best"
 	
 # Test data
 # Saved to CSV file
@@ -189,6 +198,85 @@ function inlist() {
     echo $list | tr "$delim" '\n' | grep -F -q -x "$value"
 }
 
+function get_svc_urls() {
+	##########################################
+	# Reads in parameters $svc_uc & $APISALL 
+	# (exported as file), 
+	# extracts and echos comma-
+	# delimited list of URLs for 
+	# this service.
+	# If no urls found returns 1
+	#
+	# Usage:
+	# get_svc_urls "$svc_uc" "$APISALL"
+	##########################################
+	
+	target_svc=$1
+	urls=""
+	
+	while read -r inst; do
+		readarray -td '|' arr <<< "$inst"
+		curr_svc="${arr[0]}"
+		curr_url=$(echo "${arr[2]}" | tr -d '\n')
+		
+		if [ "$curr_svc" == "$target_svc" ]; then
+			if [ "$urls" == "" ]; then
+				urls="$curr_url"
+			else
+				urls="${urls},${curr_url}"
+			fi
+		fi
+	done < data/APIS
+	
+	urls=$(echo "$urls" | tr -d '\n')
+		
+	if [ "$urls" == "" ]; then
+		echo 1
+	else
+		echo "$urls"
+	fi
+}
+
+function get_inst_url() {
+	##########################################
+	# Reads in parameters $inst (standard name
+	# of current service instance) and $APISALL
+	# Returns URL of this instance. 
+	# If no URL found returns 1
+	#
+	# Usage:
+	# get_inst_url "$inst" 
+	# UNDER DEVELOPMENT!!!!
+	##########################################
+
+	target_inst=$1
+	apis_all=$2
+	apis=$(grep "${curr_svc}" "${apis_all}")
+	target_url=""
+	
+	while IFS='\n' read currline; do
+		tokno=0
+		while IFS='|' read currtok; do
+			tokno=$( bc <<< "$tokno+1" )
+			if [ "$tokno" == "2" ]; then
+				curr_inst="$currtok"
+			elif [ "$tokno" == "3" ]; then
+				curr_url="$currtok"
+			fi
+		done <<< "$currline"
+		
+		if [ "$curr_inst" == "$target_inst" ]; then
+			target_url="$curr_url"
+		fi
+	done <<< $apis
+	
+	if [ "$target_url" == "" ]; then
+		echo 1
+	else
+		echo "$target_url"
+	fi
+}
+
 function echo_start(){
 	if ! $quiet; then 
 	
@@ -227,9 +315,9 @@ function set_mode_params(){
 	####################################
 	
 	if [ "$MODE" == "resolve" ]; then
-		SOURCES="wcvp,usda"
-		CLASS="wfo"
-		MATCHES="best"
+		SOURCES="${opt_sources}"
+		CLASS="${opt_class}"
+		MATCHES="${opt_matches}"
 		flds="Name_submitted,Name_matched,Taxonomic_status,Accepted_name,Accepted_name_author"
 	elif [ "$MODE" == "parse" ]; then
 		flds="Name_submitted, Genus, Specific_epithet, Unmatched_terms"
@@ -382,7 +470,7 @@ function ck_svc(){
 		read -ra arr <<<"$http_status"
 		http_status_code="${arr[0]}"
 	fi
-
+	
 	# Echo HTTP code
 	if ! $quiet && ( $verbose || $debug ); then 
 		echo -e "HTTP status: $http_status\n"
@@ -498,8 +586,17 @@ if $quiet; then s_opt="-s"; fi
 ########################
 unset_all
 
+# Dump API instances parameter $APISALL to file
+# Easier work with in this format
+echo "$APISALL" > data/APIS
+
 if ! $quiet; then 
 	if $init; then
+		read -p  "WARNING: You are about to run in 'init' mode.
+All responses will be saved as reference values for future checks. 
+Are you sure you want to proceed? (Y/N): " -r
+		if ! [[ $REPLY =~ ^[Yy]$ ]]; then echo "Operation cancelled"; exit 0; fi
+	
 		echo -e "Initializing ${svc_upper} service checks\n"
 	else
 		echo -e "Running ${svc_upper} service checks\n"
@@ -527,6 +624,27 @@ f_results="ck_${svc}_${inst}_results.csv"
 cat << EOT > ${DATADIR}/${f_results}
 svc,mode,status
 EOT
+
+
+
+
+########################
+# TESTING only
+########################
+
+
+svc_urls=$(get_svc_urls "$svc_uc" "$APISALL")
+
+echo -e "svc_uc: ${svc_uc}"
+echo -e "svc_urls:"
+echo -e "${svc_urls}"
+echo -e " "
+
+
+echo "exiting..."; exit 0
+
+
+
 
 ########################
 # Prepare test data
